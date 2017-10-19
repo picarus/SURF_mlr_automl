@@ -59,6 +59,7 @@ limitations under the License.
 What is the purpose
 ========================================================
 
+- Hot research topic
 - Support Data Scientists, not replace them. 
   - Many tools advertise as Automating Data Science but they don't!!
 - Free time dedicated to routine low value tasks ( 2 out of [the 4D's](https://www.forbes.com/sites/bernardmarr/2017/10/16/the-4-ds-of-robotization-dull-dirty-dangerous-and-dear): Dull and Dirty)
@@ -70,10 +71,13 @@ What can then Automatic Machine Learning do
 ========================================================
 
 - Exploratory data analysis
+- Problem identification
 - Machine learning pipeline: 
  - Redundant features
  - Missing value imputation
+- Data separation
 - Model selection
+- Model composition: ensembling, stacking
 - Hyperparameter tuning
 - ? Model diagnose
 - ? KPI extraction
@@ -88,11 +92,32 @@ Source: [TPOT](http://rhiever.github.io/tpot/)
 Existing solutions (Far from exhaustive)
 ========================================================
 
-- Auto sklearn, winner of the ChaLearn AutoML challenge (Python)
+- Auto sklearn, winner of the [ChaLearn AutoML challenge](http://automl.chalearn.org/) (Python)
 - [TPOT](http://rhiever.github.io/tpot/) (Python)
 - [Data Robot](https://www.datarobot.com/) (commercial)
 - [Skytree](http://www.skytree.net) (commercial)
 - [Automatic Statistician](https://www.automaticstatistician.com) (for Exploratory Data Analysis)
+
+Towards Skynet: Google AutoML
+==================================================
+
+![](automl-figure/googleMLlarge.PNG)
+![](automl-figure/learning.PNG)
+
+Source:[themerkle](https://themerkle.com/googles-automl-ai-clones-itself-into-a-better-version/)
+Source:[Wired](https://www.wired.com/story/googles-learning-software-learns-to-write-learning-software/)
+
+What is NOT Automatic Machine Learning
+========================================================
+
+Automatic Machine Learning is NOT Automatic Data Science.
+
+<b>To date</b>, there is no production level algorithm that can translate a business need expressed in natural language to an algorithm. There are solutions that <b>claim</b> can convert data to personalised stories around that data in natural language. An example is: <b>https://narrativescience.com</b>
+
+  ![Data](automl-figure/narrativescience.PNG)
+  
+  Store 9 your sales of item 6 are far below other stores in your region. If you are able to up your sales by only 5 units a day, you will be able to increase your profits by $1,123.
+
 
 What about R
 ==================================================
@@ -153,6 +178,8 @@ pred <- h2o.predict(aml@leader, test)
 
 ```
 
+While it does not cover all the steps in the process, it does a lot.
+
 An H20 example (2)
 ========================================================
 
@@ -204,13 +231,10 @@ I have not been able to compare with the Kaggle Leaderboard, because the metric 
 
 Source: (H20)[http://h2o-release.s3.amazonaws.com/h2o/master/3888/docs-website/h2o-docs/automl.html#code-examples]
 
-What is NOT Automatic Machine Learning
-========================================================
+Other more complete H2O example
 
-Automatic Machine Learning is NOT Automatic Data Science.
 
-<b>To date</b>, there is no production level algorithm that can translate a business need expressed in natural language to an algorithm. There are solutions that <b>claim</b> can convert data to personalised stories around that data in natural language. An example is: <b>https://narrativescience.com</b>
 
-  ![Data](narrativescience.PNG)
-  
-  Store 9 your sales of item 6 are far below other stores in your region. If you are able to up your sales by only 5 units a day, you will be able to increase your profits by $1,123.
+End of Part I
+=============
+
