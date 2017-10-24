@@ -10,7 +10,9 @@ output:
     transition: slide
     incremental: false
     css: styles.css
-    margin: 0
+    reveal_options:
+      width: 1200
+      height: 900
 ---
 
 ```{r setup, include=FALSE}
@@ -94,7 +96,7 @@ Automatic Machine Learning is NOT Automatic Data Science.
 
 ## An H2O example
 
-```{r, eval=FALSE}
+```{r, eval=FALSE, class.source='stretch'}
 library(h2o)
 
 h2o.init()
