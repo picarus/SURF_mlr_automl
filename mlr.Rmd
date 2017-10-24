@@ -108,8 +108,6 @@ ind = is.na(x)
 
 ```{r}
 
-
-
 imputeMLR <- function(){
   
   makeImputeMethod(learn = function(data, target, col, ...) {
@@ -131,8 +129,8 @@ imputeMLR <- function(){
     
     nv <- sapply(ed, function(y) {
       values %>% 
-        filter(Education == y ) %>% 
-        select(mean_LoanAmount) %>% 
+        filter_(paste0(var,' == "',y,'"') ) %>% 
+        select_(paste0('mean_',col)) %>% 
         unlist %>% 
         unname } ) 
     
