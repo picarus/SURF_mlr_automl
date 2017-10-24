@@ -3,7 +3,7 @@ title: "mlr"
 output: html_notebook
 ---
 
-REVIEW INTRO
+THIS IS NOT THE PRESENTATION YOU ARE LOOKING FOR
 
 I have mixed material from the [MLR package](https://cran.r-project.org/web/packages/mlr/index.html), its [Tutorials](https://mlr-org.github.io/mlr-tutorial/devel/html/) and also from [Sources](https://www.analyticsvidhya.com/blog/2016/08/practicing-machine-learning-techniques-in-r-with-mlr-package/).
 

@@ -3,41 +3,17 @@ title: "mlr"
 output: html_notebook
 ---
 
-I have mixed material from the [MLR package](https://cran.r-project.org/web/packages/mlr/index.html), its [Tutorials](https://mlr-org.github.io/mlr-tutorial/devel/html/) and also from [Sources](https://www.analyticsvidhya.com/blog/2016/08/practicing-machine-learning-techniques-in-r-with-mlr-package/).
-
-There is a [shinyApp available](https://github.com/mlr-org/shinyMlr), the top of automation, right?
-
-The main goal of mlr is to provide a unified interface for machine learning tasks as classification, regression, cluster analysis and survival analysis in R. In lack of a common interface it becomes a hassle to carry out standard methods like cross-validation and hyperparameter tuning for different learners. Hence, mlr offers the following features:
-
-*Possibility to fit, predict, evaluate and resample models
-*Easy extension mechanism through S3 inheritance
-*Abstract description of learners and tasks by properties
-*Parameter system for learners to encode data types and constraints
-*Many convenience methods and generic building blocks for your machine learning experiments
-*Resampling like bootstrapping, cross-validation and subsampling
-*Different visualizations for e.g. ROC curves and predictions
-*Benchmarking of learners for multiple data sets
-*Easy hyperparameter tuning using different optimization strategies
-*Variable selection with filters and wrappers
-*Nested resampling of models with tuning and feature selection
-*Cost-sensitive learning, threshold tuning and imbalance correction
-*Wrapper mechanism to extend learner functionality and complex and custom ways
-*Combine different processing steps to a complex data mining chain that can be jointly optimized
-*Extension points to integrate your own stuff
-*Parallelization is built-in
-
-Compared to caret, it supports more learners and provides more functionality. According to some [Reddit post](https://www.reddit.com/r/rstats/comments/4uac0y/caret_vs_mlr/)) mlr is a superset of caret.
 
 
 ```{r}
 library(mlr)
 library(ggplot2)
-library(rpart)
 library(dplyr)
 library(parallelMap)
+library(data.table)
 ```
 
-The data used is about the approval of Loan applications, classification problem, and is the data used in the [Analytics Vidhya post](https://www.analyticsvidhya.com/blog/2016/08/practicing-machine-learning-techniques-in-r-with-mlr-package/)
+# Load Data
 
 ```{r}
 train <- read.csv("train_loan.csv", na.strings = c(""," ",NA))
@@ -45,41 +21,54 @@ test <- read.csv("test_Y3wMUE5.csv", na.strings = c(""," ",NA))
 #test$Loan_Status <- sample(0:1,size = nrow(test),replace = T)
 ```
 
+# Data Exploration
+
 The package includes a couple of friendly methods to explore the dataset:
-
-
-```{r}
-summarizeLevels(train[,-1])
-```
-
 
 ```{r}
 summarizeColumns(train)
 ```
 
-disp is the measure of dispersion, for numerics and integers sd is used, for categorical columns the qualitative variation.
+disp is the measure of dispersion, for numerics and integers standard deviation is used, for categorical columns the qualitative variation.
 
-The framework supports all the steps in a typical Machine Learning workflow:
+```{r}
+summarizeLevels(train[,-1]) 
+```
 
-Missing value imputation is one of the functionalities provided.
+# Missing Value Imputation
+
+## Simple methods
 
 ```{r}
 
-imp <- impute(train, 
+impSimple <- impute(train, 
               cols = list(Self_Employed = imputeMode(), LoanAmount = imputeMean()), 
               dummy.cols = c("Self_Employed","LoanAmount"), 
               dummy.type = "numeric")
 
-summarizeColumns(imp$data)
+summarizeColumns(impSimple$data)
 
 ```
 
-Custom Imputation methods can be written based on MakeImputeMethod. An example can be found in [the package tutorials](https://mlr-org.github.io/mlr-tutorial/release/html/create_imputation/index.html).
+## Type based
+
+We can also impute all variables depending on their type:
+
+```{r}
+
+impType <- impute(train, classes = list(factor = imputeMode(), integer = imputeMean()),
+              dummy.classes = c("integer","factor"), dummy.type = "numeric")
+
+summarizeColumns(impType$data)
+
+```
+
+## Using a learner
 
 Imputation can also be done using any of the supported learners:
 
 ```{r}
-rpart_imp <- impute(train[,-1], 
+impRPart <- impute(train[,-1], 
                     target = "Loan_Status",
                     cols = list(LoanAmount = imputeLearner(makeLearner("regr.rpart"))
                                ,Self_Employed = imputeLearner(makeLearner("classif.rpart"))),
@@ -91,7 +80,7 @@ We can compare the results of the two imputation methods:
 
 ```{r}
 
-cmpImputations <- data.frame(select(rpart_imp$data, Self_Employed,LoanAmount,LoanAmount.dummy), 
+cmpImputations <- data.frame(select(impRPart$data, Self_Employed,LoanAmount,LoanAmount.dummy), 
                              select(imp$data, Self_Employed,LoanAmount,LoanAmount.dummy))
 
 
@@ -99,16 +88,67 @@ ggplot(filter(cmpImputations,LoanAmount.dummy==T)) + geom_point(aes(x=LoanAmount
 
 ```
 
-We can also impute all variables depending on their type:
+## Custom Learners
+
+Custom Imputation methods can be written based on MakeImputeMethod. An example can be found in [the package tutorials](https://mlr-org.github.io/mlr-tutorial/release/html/create_imputation/index.html).
+
+```{r}
+data(airquality)
+col="Ozone"
+x=airquality[[col]]
+ind = is.na(x)
+      dind = diff(ind)
+      lastValue = which(dind == 1)  # position of the last observed value previous to NA
+      lastNA = which(dind == -1)    # position of the last of potentially several consecutive NA's
+      values = x[lastValue]         # last observed value previous to NA
+      times = lastNA - lastValue    # number of consecutive NA's
+
+```
+
 
 ```{r}
 
-imp <- impute(train, classes = list(factor = imputeMode(), integer = imputeMean()),
-              dummy.classes = c("integer","factor"), dummy.type = "numeric")
 
-summarizeColumns(imp$data)
+
+imputeMLR <- function(){
+  
+  makeImputeMethod(learn = function(data, target, col, ...) {
+    input_list <- list(...)
+    var <- input_list[["var"]]
+    values <- data %>% 
+      select_( var, col) %>% 
+      group_by_(var) %>% 
+      summarise_(.dots=setNames(paste0('mean(',col,',na.rm=T)'),
+                                paste0('mean_',col)))
+    head(values)
+    return(list(values=values, var=var))
+  }, 
+  impute= function(data, target, col, values, var) {
+    
+    x <- data[[col]] 
+    ocol <- data[[var]]
+    ed <- ocol[is.na(x)]
+    
+    nv <- sapply(ed, function(y) {
+      values %>% 
+        filter(Education == y ) %>% 
+        select(mean_LoanAmount) %>% 
+        unlist %>% 
+        unname } ) 
+    
+    replace(x,is.na(x), nv)
+    
+  }, 
+  args  = list(var=c("Education"))
+  )
+}
+
+impCustom <- impute(train, cols=list(LoanAmount=imputeMLR()))
 
 ```
+
+
+## Applying the imputation
 
 We make the imputation final and apply the same imputation also to the test data:
 
@@ -117,10 +157,12 @@ train <- imp$data
 
 test$CoapplicantIncome <- as.numeric(test$CoapplicantIncome)
 
-test <- reimpute(test, imp$desc)
+test <- reimpute(test, imp$desc) # this contains the imputation algorithm
 
 summarizeColumns(test)
 ```
+
+# Feature Selection
 
 In the Feature Engineering part we can get rid of outliers:
 
@@ -128,8 +170,6 @@ In the Feature Engineering part we can get rid of outliers:
 
 train <- capLargeValues(train, target = "Loan_Status",cols = c("ApplicantIncome"),threshold = 40000)
 test <- capLargeValues(test, cols = c("ApplicantIncome"),threshold = 33000)
-
-
 
 ```
 
@@ -146,6 +186,9 @@ test$Loan_Status <- as.factor(0)
 testTask <- makeClassifTask(data = test, target = "Loan_Status")
 
 ```
+
+
+FeatSelControl: https://www.rdocumentation.org/packages/mlr/versions/2.10/topics/FeatSelControl
 
 Features can also be removed from the task, they are not used in training but remain in the data:
 
@@ -164,6 +207,9 @@ testTask <- normalizeFeatures(testTask, method = "standardize")
 
 ```
 
+
+# Feature Importance
+
 ```{r, Variable Importance}
 
 im_feat <- generateFilterValuesData(trainTask, method = c("information.gain"))
@@ -171,13 +217,38 @@ plotFilterValues(im_feat,n.show = 10)
 
 ```
 
-```{r, Learners List}
+# Parallelization
 
-lstLearners<-listLearners("classif")[c("class","package")]
-print("")
-print(lstLearners)
+Costly operations can be parallelized, using the parallelMap package:
+
+```{r, Parallel}
+parallelStart(mode="socket", cpus=4, level= "mlr.tuneParams") # oner or all 
+# "mlr.benchmark","mlr.resample","mlr.selectFeatures","mlr.tuneParams","mlr.ensemble"))
+parallelGetRegisteredLevels()
 ```
 
+```{r}
+
+parallelGetRegisteredLevels()
+
+```
+
+
+# Learners
+
+```{r, Learners List}
+
+lstLearners<-listLearners("classif")
+print("")
+names(lstLearners)
+```
+
+```{r}
+setDT(lstLearners)
+lstLearners
+```
+
+## Learning about the parameters
 
 ```{r, Training RandomForest}
 
@@ -187,16 +258,9 @@ getParamSet("classif.randomForest")
 
 
 ```{r, RandomForest Learner}
-#create a learner
+
 rf <- makeLearner("classif.randomForest", predict.type = "prob", par.vals = list(ntree = 200, mtry = 3))
-rf$par.vals <- list(importance = TRUE)
 
-```
-
-Costly operations can be parallelized:
-
-```{r, Parallel}
-parallelStartSocket(4)
 ```
 
 Define the parameters to be tuned, generating both continuous and discrete search spaces:
@@ -228,7 +292,6 @@ Finally, we run the parameter tuning:
 
 ```{r}
 
-#hypertuning
 rf_tune <- tuneParams(learner = rf, 
                       resampling = set_cv, 
                       task = trainTask, 
@@ -239,14 +302,13 @@ rf_tune <- tuneParams(learner = rf,
 ```
 
 ```{r}
-
+# Stop parallel execution
 parallelStop()
 ```
 
 ```{r}
 #cv accuracy
 rf_tune$y
-
 ```
 
 ```{r}
@@ -259,8 +321,7 @@ The effect of the parameters can be visualized pairwise, even when we have used 
 ```{r, Params dependence}
 data <- generateHyperParsEffectData(rf_tune, partial.dep = T)
 
-plt <- plotHyperParsEffect(data, x = "ntree", y = "nodesize", z = "acc.test.mean",
-  plot.type = "heatmap",  partial.dep.learn = "regr.randomForest")
+plt <- plotHyperParsEffect(data, x = "ntree", y = "nodesize", z = "acc.test.mean", plot.type = "heatmap",  partial.dep.learn = "regr.randomForest")
 min_plt = min(data$data$acc.test.mean, na.rm = TRUE)
 max_plt = max(data$data$acc.test.mean, na.rm = TRUE)
 med_plt = mean(c(min_plt, max_plt))
@@ -312,3 +373,9 @@ rfmodel <- predict(rforest, testTask)
 ```
 
 compared to Caret, I would say is more structured, particularly  the visualization  parts.
+
+
+mlrHyperOpt
+
+https://mlr-org.github.io/Parameter-tuning-with-mlrHyperopt/
+
