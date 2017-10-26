@@ -1,5 +1,6 @@
 ---
 title: "mlr"
+author: Jose Magana
 output: html_notebook
 ---
 
@@ -18,7 +19,8 @@ library(data.table)
 ```{r}
 train <- read.csv("train_loan.csv", na.strings = c(""," ",NA))
 test <- read.csv("test_Y3wMUE5.csv", na.strings = c(""," ",NA))
-#test$Loan_Status <- sample(0:1,size = nrow(test),replace = T)
+
+test$CoapplicantIncome <- as.numeric(test$CoapplicantIncome)
 ```
 
 # Data Exploration
@@ -34,6 +36,30 @@ disp is the measure of dispersion, for numerics and integers standard deviation 
 ```{r}
 summarizeLevels(train[,-1]) 
 ```
+
+# Preprocessing
+
+## Filter outliers
+
+```{r, Feature Engineering}
+
+thr <- 40000
+
+train <- capLargeValues(train, cols = c("ApplicantIncome"),threshold = thr)
+test <- capLargeValues(test, cols = c("ApplicantIncome"),threshold = thr)
+
+```
+
+## Leveraging Caret
+
+MLR offers the possibility to call Caret preprocess methods through the  makePreprocWrapperCaret method.
+
+```{r, Leveraging Caret}
+
+makePreprocWrapperCaret(learner, ppc.knnImpute = TRUE, ppc.pca = TRUE, ppc.pcaComp = 10)
+
+```
+
 
 # Missing Value Imputation
 
@@ -55,11 +81,22 @@ summarizeColumns(impSimple$data)
 We can also impute all variables depending on their type:
 
 ```{r}
-
-impType <- impute(train, classes = list(factor = imputeMode(), integer = imputeMean()),
-              dummy.classes = c("integer","factor"), dummy.type = "numeric")
+impType <- impute(train, 
+                  classes = list(factor = imputeMode(), integer = imputeMean()),
+                  dummy.classes = c("integer","factor"), dummy.type = "numeric")
 
 summarizeColumns(impType$data)
+```
+
+Careful, dummy is integer, unexpected result...use as.logical
+
+```{r}
+
+unique(impType$data$LoanAmount[as.logical(impType$data$LoanAmount.dummy)])
+
+testType<-reimpute(test,impType$desc)
+
+unique(testType$LoanAmount[is.na(test$LoanAmount)])
 
 ```
 
@@ -76,13 +113,12 @@ impRPart <- impute(train[,-1],
                     dummy.type = "numeric")
 ```
 
+
 We can compare the results of the two imputation methods:
 
 ```{r}
 
-cmpImputations <- data.frame(select(impRPart$data, Self_Employed,LoanAmount,LoanAmount.dummy), 
-                             select(imp$data, Self_Employed,LoanAmount,LoanAmount.dummy))
-
+cmpImputations <- data.frame(select(impRPart$data, LoanAmount, LoanAmount.dummy), select(impSimple$data, LoanAmount))
 
 ggplot(filter(cmpImputations,LoanAmount.dummy==T)) + geom_point(aes(x=LoanAmount, y=LoanAmount.1))
 
@@ -90,25 +126,13 @@ ggplot(filter(cmpImputations,LoanAmount.dummy==T)) + geom_point(aes(x=LoanAmount
 
 ## Custom Learners
 
-Custom Imputation methods can be written based on MakeImputeMethod. An example can be found in [the package tutorials](https://mlr-org.github.io/mlr-tutorial/release/html/create_imputation/index.html).
+Custom Imputation methods can be written based on MakeImputeMethod. An example can be found in [the package tutorials](https://mlr-org.github.io/mlr-tutorial/release/html/create_imputation/index.html) but it is not a good example as it uses LOCF (Last Observation Carried Forward) what is not a good method if you have train and test.
 
-```{r}
-data(airquality)
-col="Ozone"
-x=airquality[[col]]
-ind = is.na(x)
-      dind = diff(ind)
-      lastValue = which(dind == 1)  # position of the last observed value previous to NA
-      lastNA = which(dind == -1)    # position of the last of potentially several consecutive NA's
-      values = x[lastValue]         # last observed value previous to NA
-      times = lastNA - lastValue    # number of consecutive NA's
-
-```
-
+Instead I implemented mean by category
 
 ```{r}
 
-imputeMLR <- function(){
+imputeByCategory <- function( feature ) {
   
   makeImputeMethod(learn = function(data, target, col, ...) {
     input_list <- list(...)
@@ -127,7 +151,7 @@ imputeMLR <- function(){
     ocol <- data[[var]]
     ed <- ocol[is.na(x)]
     
-    nv <- sapply(ed, function(y) {
+    nv <- sapply(ed, function(y) {  # this sapply is not needed...
       values %>% 
         filter_(paste0(var,' == "',y,'"') ) %>% 
         select_(paste0('mean_',col)) %>% 
@@ -137,14 +161,22 @@ imputeMLR <- function(){
     replace(x,is.na(x), nv)
     
   }, 
-  args  = list(var=c("Education"))
+  args  = list(var=feature)
   )
 }
 
-impCustom <- impute(train, cols=list(LoanAmount=imputeMLR()))
+impCustom <- impute(train, cols=list(LoanAmount=imputeByCategory("Education")), 
+                    dummy.cols = c("LoanAmount"), dummy.type = "numeric")
 
 ```
 
+```{r}
+unique(impCustom$data$LoanAmount[as.logical(impCustom$data$LoanAmount.dummy)])
+
+testCustom <- reimpute(test, impCustom$desc)
+
+unique(testCustom$LoanAmount[is.na(test$LoanAmount)])
+```
 
 ## Applying the imputation
 
@@ -153,23 +185,12 @@ We make the imputation final and apply the same imputation also to the test data
 ```{r}
 train <- imp$data
 
-test$CoapplicantIncome <- as.numeric(test$CoapplicantIncome)
-
 test <- reimpute(test, imp$desc) # this contains the imputation algorithm
 
 summarizeColumns(test)
 ```
 
-# Feature Selection
-
-In the Feature Engineering part we can get rid of outliers:
-
-```{r, Feature Engineering}
-
-train <- capLargeValues(train, target = "Loan_Status",cols = c("ApplicantIncome"),threshold = 40000)
-test <- capLargeValues(test, cols = c("ApplicantIncome"),threshold = 33000)
-
-```
+#Feature Selection
 
 It is also possible to normalize, drop and remove constant features in the data or, as we will see later, in the learning task.
 
