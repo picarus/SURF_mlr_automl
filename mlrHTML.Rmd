@@ -28,8 +28,10 @@ options(width = 200)
 ## What is the purpose
 
 - Hot research topic
-- Automatic Machine Learning is NOT Automatic Data Science. <b>To date</b>, there is no production level algorithm that can translate a business need expressed in natural language to an algorithm.
-- Support Data Scientists, not replace them. Many tools advertise as Automating Data Science but they don't!!
+- Automatic Machine Learning is NOT Automatic Data Science. 
+- Many tools advertise as Automating Data Science but they don't!!
+- <b>To date</b>, there is no production level algorithm that can translate a business need expressed in natural language to an algorithm.
+- Support Data Scientists, not replace them. 
 - Free time dedicated to routine low value tasks ( 2 out of [the 4D's](https://www.forbes.com/sites/bernardmarr/2017/10/16/the-4-ds-of-robotization-dull-dirty-dangerous-and-dear): Dull and Dirty)
 - Allow quick iteration given different problem frames 
 
@@ -38,36 +40,60 @@ options(width = 200)
 
 ## What can Automatic Machine Learning do
 
-- Exploratory data analysis
-- Problem identification
-- Machine learning pipeline: 
- - Redundant features
- - Missing value imputation
-- Data separation
-- Model selection
-- Model composition: ensembling, stacking
-- Hyperparameter tuning
-- ? Model diagnose
-- ? KPI extraction
+- <b>Exploratory data analysis</b>
+- <b>Problem identification</b>
+- <b>Data cleaning:</b> missing values, outliers
+- <b>Feature selection:</b> redundant, not informative
+- <b>Feature engineering</b>
+- <b>Data separation</b>
+- <b>Model selection</b>
+- <b>Model composition:</b> ensembling, stacking
+- <b>Hyperparameter optimization</b>
+- <b>Model diagnose</b>
 
 ## {data-background-image="./automl-figure/tpot-ml-pipeline.png" data-background-size="100% 100%" data-background-transition="slide"}
 
-Source: [TPOT](http://rhiever.github.io/tpot/)
-
 # Existing solutions 
 
-## Open Source (Not exhaustive)
+## Open Source 
 
-- Auto sklearn, winner of the [ChaLearn AutoML challenge](http://automl.chalearn.org/) (Python)
-- [TPOT](http://automl.info/tpot/) (Python). Based on Genetic Algorithms and the scikit-learn
-- [AUTOWEKA](http://www.cs.ubc.ca/labs/beta/Projects/autoweka/)(Java/GUI)
-- [A repository of autoML and related solutions](https://github.com/automl)
+## Auto sklearn
+
+- Python, scikit-learn framework
+- Extensible
+- Calculate 38 meta-features on 140 datasets, about data characteristics: sample size, skewnewss, classes
+- The distance of a new dataset to this 140 datasets will be measured
+- The 25 closest used in a Bayesian Optimization to find the best instantiation
+- Winner of the [ChaLearn AutoML challenge](http://automl.chalearn.org/) 
+- [NIPS Paper](http://papers.nips.cc/paper/5872-efficient-and-robust-automated-machine-learning.pdf)
+
+<img src=automl-figure/auto-sklearn-overview.jpg height=300>
+
+## TPOT
+
+- [Tree-based Pipeline Optimization Tool](http://automl.info/tpot/) 
+- Python, scikit-learn framework
+- Based on Genetic Algorithms
+- Combining pipelines expressed as trees
+
+<img src=automl-figure/tpot-pipeline-example-768x361.png height=500>
+
+## Other
+
+- [A repository of auto ML and related solutions](https://github.com/automl)
+  - [AUTOWEKA](http://www.cs.ubc.ca/labs/beta/Projects/autoweka/)(Java/GUI)
+  - [Sequential Model-based Algorithm Configuration(SMAC)](https://github.com/automl/SMAC3): Used by autoML for Hyperparameter optimization
 
 ## Commercial (Far from exhaustive)
 
-- [Data Robot](https://www.datarobot.com/) (commercial)
-- [Skytree](http://www.skytree.net) (commercial)
+- [Data Robot](https://www.datarobot.com/) 
+<img src=automl-figure/datarobot.png height=250>
+- [Skytree](http://www.skytree.net) 
+<img src=automl-figure/skytree.png height=250>
 - [Automatic Statistician](https://www.automaticstatistician.com) (for Exploratory Data Analysis)
+ 
+ Examples: [Airline](https://www.automaticstatistician.com/static/abcdoutput/01-airline.pdf)
+          & [Affairs](file:///auto-report-affairs.pdf)
   
 ## Towards Skynet: Google AutoML
 
@@ -83,16 +109,16 @@ There are solutions that <b>claim</b> can convert data to personalised stories a
 
   <img alt="Data" src=automl-figure/narrativescience.PNG height=400>
   
-  Store 9 your sales of item 6 are far below other stores in your region. If you are able to up your sales by only 5 units a day, you will be able to increase your profits by $1,123.
+  Store 9 your sales of item 6 are far below other stores in your region. If you are able to up your sales by only 5 units a day, you will be able to increase your profits by $1,123. The sales of this product for other stores in your region seem to indicate that this is completely achievable.
 
 # R packages for Automatic Machine Learning
 
 ## The main packages
 
-- Caret
+- H2O (also Python, Java and Scala)
+- Caret 
 - MLR
-- H2O (also for Python)
-- Any other?
+- Do you know any other?
 
 ## An H2O example
 
@@ -118,15 +144,15 @@ aml <- h2o.automl(x = x, y = y,
                   leaderboard_frame = test,
                   max_runtime_secs = 100)  # was 30
 
-# If you need to generate predictions on a test set, you can make predictions directly on the 
-# `"H2OAutoML"` object, or on the leader model object directly
+# If you need to generate predictions on a test set, you can make predictions 
+# directly on the `"H2OAutoML"` object, or on the leader model object directly
 pred <- h2o.predict(aml@leader, test)
 
 ```
 
 ## An H20 example (2)
 
-```{r, eval=FALSE}
+```{r, eval=FALSE, class.source='stretch'}
 # View the AutoML Leaderboard
  aml@leaderboard
 #                                             model_id      auc  logloss
@@ -143,7 +169,7 @@ pred <- h2o.predict(aml@leader, test)
 
 ## An H20 example (3)
 
-```{r, eval=FALSE}
+```{r, eval=FALSE, class.source='stretch'}
 # The leader model is stored here
 aml@leader
 # Model Details:
@@ -182,41 +208,35 @@ aml@leader
 # 9   max min_per_class_accuracy  0.529326 0.865577 193
 # 10 max mean_per_class_accuracy  0.506534 0.869358 203
 # 
-# Gains/Lift Table: Extract with `h2o.gainsLift(<model>, <data>)` or `h2o.gainsLift(<model>, valid=<T/F>, xval=<T/F>)`
+# Gains/Lift Table: Extract with `h2o.gainsLift(<model>, <data>)` or 
+#  `h2o.gainsLift(<model>, valid=<T/F>, xval=<T/F>)`
 
 ```
 
 Source: (H20)[http://h2o-release.s3.amazonaws.com/h2o/master/3888/docs-website/h2o-docs/automl.html#code-examples]
 
-# MLR
+## CARET
 
-I have mixed material from the [MLR package](https://cran.r-project.org/web/packages/mlr/index.html), its [Tutorials](https://mlr-org.github.io/mlr-tutorial/devel/html/) and also from [Sources](https://www.analyticsvidhya.com/blog/2016/08/practicing-machine-learning-techniques-in-r-with-mlr-package/).
+- Short for _C_lassification _A_nd _RE_gression _T_raining).
+- Documented extensively: [book Applied Predictive Modelling](http://www.springer.com/gp/book/9781461468486), a [paper](https://www.jstatsoft.org/article/view/v028i05) and a [Datacamp training](https://www.datacamp.com/courses/machine-learning-toolbox).
+- Focused on less steps of the processing pipeline:
+- data splitting
+- pre-processing
+- feature selection
+- model tuning using resampling
+- variable importance estimation
 
-There is a [shinyApp available](https://github.com/mlr-org/shinyMlr), the top of automation, right?
+## MLR
 
-The main goal of mlr is to provide a unified interface for machine learning tasks as classification, regression, cluster analysis and survival analysis in R. In lack of a common interface it becomes a hassle to carry out standard methods like cross-validation and hyperparameter tuning for different learners. Hence, mlr offers the following features:
+- Covers the whole ML pipeline
+- Extensible 
+- Built-in parallelization
+- [shinyApp available](https://github.com/mlr-org/shinyMlr), the top of automation, right?
+ 
+## Sources about MLR
 
-*Possibility to fit, predict, evaluate and resample models
-*Easy extension mechanism through S3 inheritance
-*Abstract description of learners and tasks by properties
-*Parameter system for learners to encode data types and constraints
-*Many convenience methods and generic building blocks for your machine learning experiments
-*Resampling like bootstrapping, cross-validation and subsampling
-*Different visualizations for e.g. ROC curves and predictions
-*Benchmarking of learners for multiple data sets
-*Easy hyperparameter tuning using different optimization strategies
-*Variable selection with filters and wrappers
-*Nested resampling of models with tuning and feature selection
-*Cost-sensitive learning, threshold tuning and imbalance correction
-*Wrapper mechanism to extend learner functionality and complex and custom ways
-*Combine different processing steps to a complex data mining chain that can be jointly optimized
-*Extension points to integrate your own stuff
-*Parallelization is built-in
-
-Compared to caret, it supports more learners and provides more functionality. According to some [Reddit post](https://www.reddit.com/r/rstats/comments/4uac0y/caret_vs_mlr/)) mlr is a superset of caret.
-
+I have mixed material from the [MLR package](https://cran.r-project.org/web/packages/mlr/index.html), its [Tutorials](https://mlr-org.github.io/mlr-tutorial/devel/html/) and also from [Blogs](https://www.analyticsvidhya.com/blog/2016/08/practicing-machine-learning-techniques-in-r-with-mlr-package/).
 The data used is about the approval of Loan applications, classification problem, and is the data used in the [Analytics Vidhya post](https://www.analyticsvidhya.com/blog/2016/08/practicing-machine-learning-techniques-in-r-with-mlr-package/)
-
 
 # End of Part I
 

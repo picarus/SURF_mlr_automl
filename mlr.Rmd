@@ -17,8 +17,8 @@ library(data.table)
 # Load Data
 
 ```{r}
-train <- read.csv("train_loan.csv", na.strings = c(""," ",NA))
-test <- read.csv("test_Y3wMUE5.csv", na.strings = c(""," ",NA))
+train <- read.csv("train_data.csv", na.strings = c(""," ",NA))
+test <- read.csv("test_data.csv", na.strings = c(""," ",NA))
 
 test$CoapplicantIncome <- as.numeric(test$CoapplicantIncome)
 ```
@@ -68,8 +68,8 @@ makePreprocWrapperCaret(learner, ppc.knnImpute = TRUE, ppc.pca = TRUE, ppc.pcaCo
 ```{r}
 
 impSimple <- impute(train, 
-              cols = list(Self_Employed = imputeMode(), LoanAmount = imputeMean()), 
-              dummy.cols = c("Self_Employed","LoanAmount"), 
+              cols = list(Self_Employed = imputeMode(), Amount = imputeMean()), 
+              dummy.cols = c("Self_Employed","Amount"), 
               dummy.type = "numeric")
 
 summarizeColumns(impSimple$data)
@@ -92,11 +92,11 @@ Careful, dummy is integer, unexpected result...use as.logical
 
 ```{r}
 
-unique(impType$data$LoanAmount[as.logical(impType$data$LoanAmount.dummy)])
+unique(impType$data$Amount[as.logical(impType$data$Amount.dummy)])
 
 testType<-reimpute(test,impType$desc)
 
-unique(testType$LoanAmount[is.na(test$LoanAmount)])
+unique(testType$LoanAmount[is.na(test$Amount)])
 
 ```
 
@@ -106,10 +106,10 @@ Imputation can also be done using any of the supported learners:
 
 ```{r}
 impRPart <- impute(train[,-1], 
-                    target = "Loan_Status",
-                    cols = list(LoanAmount = imputeLearner(makeLearner("regr.rpart"))
+                    target = "Status",
+                    cols = list(Amount = imputeLearner(makeLearner("regr.rpart"))
                                ,Self_Employed = imputeLearner(makeLearner("classif.rpart"))),
-                    dummy.cols = c("Self_Employed","LoanAmount"),
+                    dummy.cols = c("Self_Employed","Amount"),
                     dummy.type = "numeric")
 ```
 
@@ -118,9 +118,9 @@ We can compare the results of the two imputation methods:
 
 ```{r}
 
-cmpImputations <- data.frame(select(impRPart$data, LoanAmount, LoanAmount.dummy), select(impSimple$data, LoanAmount))
+cmpImputations <- data.frame(select(impRPart$data, Amount, Amount.dummy), select(impSimple$data, Amount))
 
-ggplot(filter(cmpImputations,LoanAmount.dummy==T)) + geom_point(aes(x=LoanAmount, y=LoanAmount.1))
+ggplot(filter(cmpImputations,Amount.dummy==T)) + geom_point(aes(x=Amount, y=Amount.1))
 
 ```
 
@@ -165,17 +165,17 @@ imputeByCategory <- function( feature ) {
   )
 }
 
-impCustom <- impute(train, cols=list(LoanAmount=imputeByCategory("Education")), 
-                    dummy.cols = c("LoanAmount"), dummy.type = "numeric")
+impCustom <- impute(train, cols=list(Amount=imputeByCategory("Education")), 
+                    dummy.cols = c("Amount"), dummy.type = "numeric")
 
 ```
 
 ```{r}
-unique(impCustom$data$LoanAmount[as.logical(impCustom$data$LoanAmount.dummy)])
+unique(impCustom$data$Amount[as.logical(impCustom$data$Amount.dummy)])
 
 testCustom <- reimpute(test, impCustom$desc)
 
-unique(testCustom$LoanAmount[is.na(test$LoanAmount)])
+unique(testCustom$Amount[is.na(test$Amount)])
 ```
 
 ## Applying the imputation
@@ -199,10 +199,10 @@ The main part is creating a Task that will contain the data to be used:
 
 ```{r, Machine Learning Task}
 #Create a task indicating the positive class.
-trainTask <- makeClassifTask(data = train, target = "Loan_Status", positive = "Y")
+trainTask <- makeClassifTask(data = train, target = "Status", positive = "Y")
 
-test$Loan_Status <- as.factor(0)
-testTask <- makeClassifTask(data = test, target = "Loan_Status")
+test$Status <- as.factor(0)
+testTask <- makeClassifTask(data = test, target = "Status")
 
 ```
 
@@ -213,7 +213,7 @@ Features can also be removed from the task, they are not used in training but re
 
 ```{r, Drop Features}
  
-trainTask <- dropFeatures(task = trainTask, features = c("Loan_ID","Married.dummy"))
+trainTask <- dropFeatures(task = trainTask, features = c("ID","Married.dummy"))
 
 ```
 
@@ -284,6 +284,7 @@ rf <- makeLearner("classif.randomForest", predict.type = "prob", par.vals = list
 
 Define the parameters to be tuned, generating both continuous and discrete search spaces:
 
+
 ```{r}
 #set tunable parameters
 #grid search to find hyperparameters
@@ -292,6 +293,7 @@ rf_param <- makeParamSet( makeIntegerParam("ntree", lower = 50, upper = 500),
                           makeDiscreteParam("mtry", values=c(3, 4, 7, 10)),
                           makeIntegerParam("nodesize", lower = 10, upper = 50))
 ```
+
 
 How the search is going to be made (other methods include GridSearch, SimulateadAnnealing, BayesianOptimization ):
 
@@ -319,6 +321,7 @@ rf_tune <- tuneParams(learner = rf,
                       measures = acc)
 
 ```
+
 
 ```{r}
 # Stop parallel execution
@@ -358,9 +361,6 @@ rf.tree <- setHyperPars(rf, par.vals = rf_tune$x)
 #train a model
 rforest <- train(rf.tree, trainTask)
 getLearnerModel(rforest)
-
-
-
 
 ```
 
