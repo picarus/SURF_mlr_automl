@@ -4,23 +4,26 @@ author: Jose Magana
 output: html_notebook
 ---
 
-
-
 ```{r}
 library(mlr)
 library(ggplot2)
-library(dplyr)
 library(parallelMap)
 library(data.table)
+library(dplyr)
+library(dtplyr)
 ```
 
 # Load Data
 
 ```{r}
-train <- read.csv("train_data.csv", na.strings = c(""," ",NA))
-test <- read.csv("test_data.csv", na.strings = c(""," ",NA))
+train <- fread("train.csv", na.strings = c(""," ","<NA>",NA), colClasses = c("character","logical","factor","character","factor","numeric","integer","integer","character","numeric","character","factor") )
 
-test$CoapplicantIncome <- as.numeric(test$CoapplicantIncome)
+train <- as.data.frame(train)  # some issues working with data.table
+
+test <- fread("test.csv", na.strings = c(""," ","<NA>",NA), colClasses=c("character","factor","character","factor","numeric","integer","integer","character","numeric","character","factor"))
+
+test <- as.data.frame(test)
+
 ```
 
 # Data Exploration
@@ -34,7 +37,8 @@ summarizeColumns(train)
 disp is the measure of dispersion, for numerics and integers standard deviation is used, for categorical columns the qualitative variation.
 
 ```{r}
-summarizeLevels(train[,-1]) 
+
+summarizeLevels(subset(train,select=-c(PassengerId,Name,Ticket,Cabin))) 
 ```
 
 # Preprocessing
@@ -43,20 +47,22 @@ summarizeLevels(train[,-1])
 
 ```{r, Feature Engineering}
 
-thr <- 40000
+thr <- 480
 
-train <- capLargeValues(train, cols = c("ApplicantIncome"),threshold = thr)
-test <- capLargeValues(test, cols = c("ApplicantIncome"),threshold = thr)
+train <- capLargeValues(train, cols = c("Fare"),threshold = thr)
+test <- capLargeValues(test, cols = c("Fare"),threshold = thr)
 
 ```
+
+## Data cleaning
 
 ## Leveraging Caret
 
 MLR offers the possibility to call Caret preprocess methods through the  makePreprocWrapperCaret method.
 
-```{r, Leveraging Caret}
+```{r, Leveraging Caret, }
 
-makePreprocWrapperCaret(learner, ppc.knnImpute = TRUE, ppc.pca = TRUE, ppc.pcaComp = 10)
+# makePreprocWrapperCaret(learner, ppc.knnImpute = TRUE, ppc.pca = TRUE, ppc.pcaComp = 10)
 
 ```
 
@@ -68,11 +74,23 @@ makePreprocWrapperCaret(learner, ppc.knnImpute = TRUE, ppc.pca = TRUE, ppc.pcaCo
 ```{r}
 
 impSimple <- impute(train, 
-              cols = list(Self_Employed = imputeMode(), Amount = imputeMean()), 
-              dummy.cols = c("Self_Employed","Amount"), 
+              cols = list(Embarked = imputeMode(), Age = imputeMean()), 
+              dummy.cols = c("Embarked","Age"), 
               dummy.type = "numeric")
 
 summarizeColumns(impSimple$data)
+
+```
+
+Careful, dummy is integer, unexpected result...use as.logical
+
+```{r}
+
+unique(impSimple$data$Age[as.logical(impSimple$data$Age.dummy)])
+
+testSimple<-reimpute(test,impSimple$desc)
+
+unique(testSimple$Age[is.na(test$Age)])
 
 ```
 
@@ -82,22 +100,11 @@ We can also impute all variables depending on their type:
 
 ```{r}
 impType <- impute(train, 
-                  classes = list(factor = imputeMode(), integer = imputeMean()),
-                  dummy.classes = c("integer","factor"), dummy.type = "numeric")
+                  classes = list(integer = imputeMean()),
+                  dummy.classes = c("integer"), 
+                  dummy.type = "numeric")
 
 summarizeColumns(impType$data)
-```
-
-Careful, dummy is integer, unexpected result...use as.logical
-
-```{r}
-
-unique(impType$data$Amount[as.logical(impType$data$Amount.dummy)])
-
-testType<-reimpute(test,impType$desc)
-
-unique(testType$LoanAmount[is.na(test$Amount)])
-
 ```
 
 ## Using a learner
@@ -105,11 +112,11 @@ unique(testType$LoanAmount[is.na(test$Amount)])
 Imputation can also be done using any of the supported learners:
 
 ```{r}
-impRPart <- impute(train[,-1], 
-                    target = "Status",
-                    cols = list(Amount = imputeLearner(makeLearner("regr.rpart"))
-                               ,Self_Employed = imputeLearner(makeLearner("classif.rpart"))),
-                    dummy.cols = c("Self_Employed","Amount"),
+impRPart <- impute(train[,c(-1)], 
+                    target = "Survived",
+                    cols = list(Age = imputeLearner(makeLearner("regr.rpart"), features=c("SibSp","Parch","Sex","Fare"))
+                               ,Embarked = imputeLearner(makeLearner("classif.rpart"), features=c("SibSp","Parch","Sex","Fare"))),
+                    dummy.cols = c("Embarked","Age"),
                     dummy.type = "numeric")
 ```
 
@@ -118,9 +125,9 @@ We can compare the results of the two imputation methods:
 
 ```{r}
 
-cmpImputations <- data.frame(select(impRPart$data, Amount, Amount.dummy), select(impSimple$data, Amount))
+cmpImputations <- data.frame(select(impRPart$data, Age, Age.dummy), select(impSimple$data, Age))
 
-ggplot(filter(cmpImputations,Amount.dummy==T)) + geom_point(aes(x=Amount, y=Amount.1))
+ggplot( filter(cmpImputations, Age.dummy==T)) + geom_point(aes(x=Age, y=Age.1))
 
 ```
 
@@ -140,42 +147,39 @@ imputeByCategory <- function( feature ) {
     values <- data %>% 
       select_( var, col) %>% 
       group_by_(var) %>% 
-      summarise_(.dots=setNames(paste0('mean(',col,',na.rm=T)'),
-                                paste0('mean_',col)))
+      summarise_(.dots=setNames( paste0('mean(',col,',na.rm=T)'), paste0('mean_',col)))
     head(values)
     return(list(values=values, var=var))
   }, 
   impute= function(data, target, col, values, var) {
     
     x <- data[[col]] 
-    ocol <- data[[var]]
-    ed <- ocol[is.na(x)]
+    ed <- data[[var]][is.na(x)]
     
     nv <- sapply(ed, function(y) {  # this sapply is not needed...
       values %>% 
-        filter_(paste0(var,' == "',y,'"') ) %>% 
-        select_(paste0('mean_',col)) %>% 
+        filter_(paste0(var,' == "', y, '"') ) %>% 
+        select_(paste0('mean_', col)) %>% 
         unlist %>% 
         unname } ) 
     
-    replace(x,is.na(x), nv)
+    replace(x, is.na(x), nv)
     
   }, 
   args  = list(var=feature)
   )
 }
 
-impCustom <- impute(train, cols=list(Amount=imputeByCategory("Education")), 
-                    dummy.cols = c("Amount"), dummy.type = "numeric")
+impCustom <- impute(train, cols=list(Age=imputeByCategory("Sex")), dummy.cols = c("Age"), dummy.type = "numeric")
 
 ```
 
 ```{r}
-unique(impCustom$data$Amount[as.logical(impCustom$data$Amount.dummy)])
+unique(impCustom$data$Age[as.logical(impCustom$data$Age.dummy)])
 
 testCustom <- reimpute(test, impCustom$desc)
 
-unique(testCustom$Amount[is.na(test$Amount)])
+unique(testCustom$Age[is.na(test$Age)])
 ```
 
 ## Applying the imputation
@@ -183,9 +187,9 @@ unique(testCustom$Amount[is.na(test$Amount)])
 We make the imputation final and apply the same imputation also to the test data:
 
 ```{r}
-train <- imp$data
+train <- impCustom$data
 
-test <- reimpute(test, imp$desc) # this contains the imputation algorithm
+test <- reimpute(test, impCustom$desc) # this contains the imputation algorithm
 
 summarizeColumns(test)
 ```
@@ -196,13 +200,12 @@ It is also possible to normalize, drop and remove constant features in the data 
 
 The main part is creating a Task that will contain the data to be used:
 
-
 ```{r, Machine Learning Task}
 #Create a task indicating the positive class.
-trainTask <- makeClassifTask(data = train, target = "Status", positive = "Y")
+trainTask <- makeClassifTask(data = train, target = "Survived", positive = "Y")
 
 test$Status <- as.factor(0)
-testTask <- makeClassifTask(data = test, target = "Status")
+testTask <- makeClassifTask(data = test, target = "Survived")
 
 ```
 
@@ -213,7 +216,7 @@ Features can also be removed from the task, they are not used in training but re
 
 ```{r, Drop Features}
  
-trainTask <- dropFeatures(task = trainTask, features = c("ID","Married.dummy"))
+trainTask <- dropFeatures(task = trainTask, features = c("PassengerID","Married.dummy"))
 
 ```
 
@@ -251,7 +254,6 @@ parallelGetRegisteredLevels()
 parallelGetRegisteredLevels()
 
 ```
-
 
 # Learners
 
@@ -347,8 +349,7 @@ plt <- plotHyperParsEffect(data, x = "ntree", y = "nodesize", z = "acc.test.mean
 min_plt = min(data$data$acc.test.mean, na.rm = TRUE)
 max_plt = max(data$data$acc.test.mean, na.rm = TRUE)
 med_plt = mean(c(min_plt, max_plt))
-plt + scale_fill_gradient2(breaks = seq(min_plt, max_plt, length.out = 5),
-  low = "blue", mid = "white", high = "red", midpoint = med_plt)
+plt + scale_fill_gradient2(breaks = seq(min_plt, max_plt, length.out = 5), low = "blue", mid = "white", high = "red", midpoint = med_plt)
 
 ```
 
@@ -391,8 +392,12 @@ rfmodel <- predict(rforest, testTask)
 
 ```
 
-compared to Caret, I would say is more structured, particularly  the visualization  parts.
+# Putting it all together and cleaning up
 
+```{r}
+
+
+```
 
 mlrHyperOpt
 
