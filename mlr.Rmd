@@ -9,20 +9,21 @@ library(mlr)
 library(ggplot2)
 library(parallelMap)
 library(data.table)
-library(dplyr)
 library(dtplyr)
+library(dplyr)
+library(mlrMBO)
+
+source("utils.R")
 ```
 
 # Load Data
 
 ```{r}
-train <- fread("train.csv", na.strings = c(""," ","<NA>",NA), colClasses = c("character","logical","factor","character","factor","numeric","integer","integer","character","numeric","character","factor") )
+train <- fread("train.csv", na.strings = c(""," ","<NA>",NA), 
+               colClasses = c("factor","logical","factor","character","factor","numeric","integer","integer","character","numeric","character","factor") )
 
-train <- as.data.frame(train)  # some issues working with data.table
-
-test <- fread("test.csv", na.strings = c(""," ","<NA>",NA), colClasses=c("character","factor","character","factor","numeric","integer","integer","character","numeric","character","factor"))
-
-test <- as.data.frame(test)
+test <- fread("test.csv", na.strings = c(""," ","<NA>",NA),
+              colClasses=c("factor","factor","character","factor","numeric","integer","integer","character","numeric","character","factor"))
 
 ```
 
@@ -36,36 +37,71 @@ summarizeColumns(train)
 
 disp is the measure of dispersion, for numerics and integers standard deviation is used, for categorical columns the qualitative variation.
 
-```{r}
+I find it much clear than:
 
-summarizeLevels(subset(train,select=-c(PassengerId,Name,Ticket,Cabin))) 
+```{r}
+summary(train)
 ```
 
 # Preprocessing
 
-## Filter outliers
+## Data cleaning
 
-```{r, Feature Engineering}
+```{r, Data Cleaning}
 
-thr <- 480
+train <- preprocess(train)
+test <- preprocess(test)
 
-train <- capLargeValues(train, cols = c("Fare"),threshold = thr)
-test <- capLargeValues(test, cols = c("Fare"),threshold = thr)
+train <- as.data.frame(train)  # some issues working with data.table
+test <- as.data.frame(test)
 
 ```
 
-## Data cleaning
+```{r}
+summarizeLevels(subset(train,select=-c(PassengerId, Name, Ticket, Cabin, LastName)))
+```
+
+```{r}
+summarizeLevels(subset(test,select=-c(PassengerId, Name, Ticket, Cabin, LastName))) 
+```
+
+```{r}
+summarizeColumns(train)
+```
+
+## Filter outliers
+
+```{r, View outliers}
+
+ggplot(train)+geom_histogram(aes(x=Fare),binwidth=20)
+
+```
+
+
+```{r, Filter outliers}
+
+thr <- 300
+
+train <- capLargeValues(train, cols = c("Fare"), threshold = thr)
+test <- capLargeValues(test, cols = c("Fare"), threshold = thr)
+
+```
+
+```{r, Check outliers}
+
+ggplot(train)+geom_histogram(aes(x=Fare),binwidth=20)
+
+```
 
 ## Leveraging Caret
 
 MLR offers the possibility to call Caret preprocess methods through the  makePreprocWrapperCaret method.
 
-```{r, Leveraging Caret, }
+```{r, Leveraging Caret, eval=FALSE}
 
 # makePreprocWrapperCaret(learner, ppc.knnImpute = TRUE, ppc.pca = TRUE, ppc.pcaComp = 10)
 
 ```
-
 
 # Missing Value Imputation
 
@@ -75,10 +111,10 @@ MLR offers the possibility to call Caret preprocess methods through the  makePre
 
 impSimple <- impute(train, 
               cols = list(Embarked = imputeMode(), Age = imputeMean()), 
-              dummy.cols = c("Embarked","Age"), 
+              dummy.cols = c("Age"), 
               dummy.type = "numeric")
 
-summarizeColumns(impSimple$data)
+summarizeColumns(impSimple$data[,c("Embarked","Age")])
 
 ```
 
@@ -100,26 +136,27 @@ We can also impute all variables depending on their type:
 
 ```{r}
 impType <- impute(train, 
-                  classes = list(integer = imputeMean()),
-                  dummy.classes = c("integer"), 
+                  classes = list(numeric = imputeMean()),
+                  dummy.classes = c("numeric"), 
                   dummy.type = "numeric")
 
-summarizeColumns(impType$data)
+summarizeColumns(impType$data[,c("Age","Age.dummy"), drop=F])
 ```
 
 ## Using a learner
 
-Imputation can also be done using any of the supported learners:
+Imputation can also be done using any of the supported learners, here we use a decision tree:
 
 ```{r}
+
 impRPart <- impute(train[,c(-1)], 
                     target = "Survived",
                     cols = list(Age = imputeLearner(makeLearner("regr.rpart"), features=c("SibSp","Parch","Sex","Fare"))
                                ,Embarked = imputeLearner(makeLearner("classif.rpart"), features=c("SibSp","Parch","Sex","Fare"))),
                     dummy.cols = c("Embarked","Age"),
                     dummy.type = "numeric")
-```
 
+```
 
 We can compare the results of the two imputation methods:
 
@@ -133,9 +170,9 @@ ggplot( filter(cmpImputations, Age.dummy==T)) + geom_point(aes(x=Age, y=Age.1))
 
 ## Custom Learners
 
-Custom Imputation methods can be written based on MakeImputeMethod. An example can be found in [the package tutorials](https://mlr-org.github.io/mlr-tutorial/release/html/create_imputation/index.html) but it is not a good example as it uses LOCF (Last Observation Carried Forward) what is not a good method if you have train and test.
+Custom Imputation methods can be written based on MakeImputeMethod. 
 
-Instead I implemented mean by category
+I implemented mean by Sex:
 
 ```{r}
 
@@ -187,12 +224,27 @@ unique(testCustom$Age[is.na(test$Age)])
 We make the imputation final and apply the same imputation also to the test data:
 
 ```{r}
-train <- impCustom$data
+train <- impSimple$data
 
-test <- reimpute(test, impCustom$desc) # this contains the imputation algorithm
+test <- reimpute(test, impSimple$desc) # this contains the imputation algorithm
 
 summarizeColumns(test)
 ```
+
+#Feature engineering
+
+```{r, Feature Engineering}
+
+train <- featureEngineering(train)
+test <- featureEngineering(test)
+
+```
+
+```{r}
+summarizeColumns(train)
+```
+
+
 
 #Feature Selection
 
@@ -201,14 +253,21 @@ It is also possible to normalize, drop and remove constant features in the data 
 The main part is creating a Task that will contain the data to be used:
 
 ```{r, Machine Learning Task}
-#Create a task indicating the positive class.
-trainTask <- makeClassifTask(data = train, target = "Survived", positive = "Y")
 
-test$Status <- as.factor(0)
+# it doesn't accept Logical or Character fields, must be factor
+
+train <- reType(train)
+test <- reType(test)
+
+#Create a task indicating the positive class.
+
+trainTask <- makeClassifTask(data = train, target = "Survived", positive = "1")
+
+test$Survived <- as.factor(0)
+
 testTask <- makeClassifTask(data = test, target = "Survived")
 
 ```
-
 
 FeatSelControl: https://www.rdocumentation.org/packages/mlr/versions/2.10/topics/FeatSelControl
 
@@ -216,7 +275,24 @@ Features can also be removed from the task, they are not used in training but re
 
 ```{r, Drop Features}
  
-trainTask <- dropFeatures(task = trainTask, features = c("PassengerID","Married.dummy"))
+trainTask <- dropFeatures(task = trainTask, features = c("PassengerId","Name","LastName","Ticket","Cabin"))
+
+```
+
+## Feature Importance
+
+```{r, Variable Importance}
+
+varImp <- generateFilterValuesData(trainTask, method = c("information.gain"))
+plotFilterValues(varImp,n.show = 20)
+
+```
+
+```{r, Drop Some More Features}
+ 
+filteredTask <- filterFeatures(trainTask, fval = varImp, threshold = 0.001)
+
+filteredTask
 
 ```
 
@@ -224,20 +300,17 @@ Normalize Features:
 
 ```{r, Normalize}
 
-trainTask <- normalizeFeatures(trainTask, method = "standardize")
-testTask <- normalizeFeatures(testTask, method = "standardize")
+trainTask <- normalizeFeatures(trainTask, cols="Age", method = "standardize")
+testTask <- normalizeFeatures(testTask, cols="Age", method = "standardize")
 
 ```
 
+```{r}
 
-# Feature Importance
-
-```{r, Variable Importance}
-
-im_feat <- generateFilterValuesData(trainTask, method = c("information.gain"))
-plotFilterValues(im_feat,n.show = 10)
+summarizeColumns(trainTask$env$data[,c("Age"), drop=F])
 
 ```
+
 
 # Parallelization
 
@@ -246,7 +319,7 @@ Costly operations can be parallelized, using the parallelMap package:
 ```{r, Parallel}
 parallelStart(mode="socket", cpus=4, level= "mlr.tuneParams") # oner or all 
 # "mlr.benchmark","mlr.resample","mlr.selectFeatures","mlr.tuneParams","mlr.ensemble"))
-parallelGetRegisteredLevels()
+
 ```
 
 ```{r}
@@ -259,9 +332,8 @@ parallelGetRegisteredLevels()
 
 ```{r, Learners List}
 
-lstLearners<-listLearners("classif")
-print("")
-names(lstLearners)
+lstLearners <- listLearners("classif")
+
 ```
 
 ```{r}
@@ -280,7 +352,7 @@ getParamSet("classif.randomForest")
 
 ```{r, RandomForest Learner}
 
-rf <- makeLearner("classif.randomForest", predict.type = "prob", par.vals = list(ntree = 200, mtry = 3))
+rf <- makeLearner("classif.randomForest", predict.type = "prob")
 
 ```
 
@@ -292,7 +364,7 @@ Define the parameters to be tuned, generating both continuous and discrete searc
 #grid search to find hyperparameters
 
 rf_param <- makeParamSet( makeIntegerParam("ntree", lower = 50, upper = 500),
-                          makeDiscreteParam("mtry", values=c(3, 4, 7, 10)),
+                          makeIntegerParam("mtry", lower = 3, upper = 8),
                           makeIntegerParam("nodesize", lower = 10, upper = 50))
 ```
 
@@ -301,7 +373,8 @@ How the search is going to be made (other methods include GridSearch, Simulatead
 
 ```{r}
 #let's do random search for 50 iterations
-rancontrol <- makeTuneControlRandom(maxit = 50L)
+
+ranControl <- makeTuneControlRandom(maxit = 100L)
 ```
 
 Resampling strategy (other methods include repeatCV, bootstrap, holdout, leave-one-out, subsampling )
@@ -315,14 +388,21 @@ Finally, we run the parameter tuning:
 
 ```{r}
 
-rf_tune <- tuneParams(learner = rf, 
+rf_tuneRan <- tuneParams(learner = rf, 
                       resampling = set_cv, 
                       task = trainTask, 
                       par.set = rf_param, 
-                      control = rancontrol, 
-                      measures = acc)
+                      control = ranControl, 
+                      measures = auc)
 
 ```
+
+```{r}
+#cv accuracy
+rf_tuneRan$y
+```
+
+
 
 
 ```{r}
@@ -330,14 +410,10 @@ rf_tune <- tuneParams(learner = rf,
 parallelStop()
 ```
 
-```{r}
-#cv accuracy
-rf_tune$y
-```
 
 ```{r}
 #best parameters
-rf_tune$x
+rf_tuneRan$x
 ```
 
 The effect of the parameters can be visualized pairwise, even when we have used more than two params. A learner is specified to "extrapolate":
@@ -345,7 +421,7 @@ The effect of the parameters can be visualized pairwise, even when we have used 
 ```{r, Params dependence}
 data <- generateHyperParsEffectData(rf_tune, partial.dep = T)
 
-plt <- plotHyperParsEffect(data, x = "ntree", y = "nodesize", z = "acc.test.mean", plot.type = "heatmap",  partial.dep.learn = "regr.randomForest")
+plt <- plotHyperParsEffect(data, x = "ntree", y = "mtry", z = "acc.test.mean", plot.type = "heatmap",  partial.dep.learn = "regr.randomForest")
 min_plt = min(data$data$acc.test.mean, na.rm = TRUE)
 max_plt = max(data$data$acc.test.mean, na.rm = TRUE)
 med_plt = mean(c(min_plt, max_plt))
@@ -384,20 +460,60 @@ plotROCCurves(df)
 
 ```
 
-Make final predictions  on the test data set:
+```{r}
+
+#des <- generateDesign(n = 10, par.set = rf_param, fun = lhs::randomLHS)
+
+mboControl <- makeMBOControl(save.on.disk.at = c(0, 5, 10, 20, 50, 75, 85, 90), save.file.path = ".")
+mboControl <- setMBOControlTermination(mboControl, iters = 90)
+mboControl <- setMBOControlInfill(mboControl, crit = makeMBOInfillCritEI())
+
+tuneMBOControl <- makeTuneControlMBO(mbo.control = mboControl)
+
+#run <- exampleRun(obj.fun, learner = rf, control = mboControl, show.info = FALSE)
+
+```
+
+```{r}
+rf_tuneMBO <- tuneParams(learner = rf, 
+                      resampling = set_cv, 
+                      task = trainTask, 
+                      par.set = rf_param, 
+                      control = tuneMBOControl, 
+                      measures = auc)
+
+```
+
+```{r}
+#cv accuracy
+rf_tuneMBO$y
+```
+
+```{r}
+#best parameters
+rf_tuneMBO$x
+```
+
+
+
+Make final predictions on the test data set:
 
 ```{r}
 
+testTask$env$data <- checkLevels(trainTask$env$data, testTask$env$data)
+
+```
+
+
+```{r}
 rfmodel <- predict(rforest, testTask)
 
-```
-
-# Putting it all together and cleaning up
-
-```{r}
-
+rfmodel
 
 ```
+
+2nd model
+Stacking
 
 mlrHyperOpt
 
