@@ -19,9 +19,8 @@ preprocess <- function(dt){
   dt <- dt[Title %in% c("Capt","Major"), Title := "Col"]
   dt[, Title :=factor(Title)]
   
-  dt[ is.na(Cabin), Cabin:="Missing"]
+  dt[ is.na(Cabin) | Cabin == "", Cabin:="M"]
   dt[ Cabin != "", CabinType := substr(Cabin, 1, 1)]
-  dt[ Cabin == "", CabinType := "X"]
   dt[, CabinType := factor(CabinType)]
   
   # meanAges <- dt[, .(meanAge=mean(Age, na.rm=T)), by = Title]

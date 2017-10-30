@@ -37,7 +37,7 @@ summarizeColumns(train)
 
 disp is the measure of dispersion, for numerics and integers standard deviation is used, for categorical columns the qualitative variation.
 
-I find it much clear than:
+I find it much clear than the standard R summary:
 
 ```{r}
 summary(train)
@@ -67,6 +67,11 @@ summarizeLevels(subset(test,select=-c(PassengerId, Name, Ticket, Cabin, LastName
 
 ```{r}
 summarizeColumns(train)
+```
+
+
+```{r}
+summary(train)
 ```
 
 ## Filter outliers
@@ -114,14 +119,15 @@ impSimple <- impute(train,
               dummy.cols = c("Age"), 
               dummy.type = "numeric")
 
-summarizeColumns(impSimple$data[,c("Embarked","Age")])
+summarizeColumns(impSimple$data[,c("Embarked","Age","Age.dummy")])
 
 ```
 
-Careful, dummy is integer, unexpected result...use as.logical
+The object return by impute has two parts, data that contains the new data an desc that contains
 
 ```{r}
 
+# Careful, dummy is integer, unexpected result...use as.logical
 unique(impSimple$data$Age[as.logical(impSimple$data$Age.dummy)])
 
 testSimple<-reimpute(test,impSimple$desc)
@@ -158,21 +164,11 @@ impRPart <- impute(train[,c(-1)],
 
 ```
 
-We can compare the results of the two imputation methods:
-
-```{r}
-
-cmpImputations <- data.frame(select(impRPart$data, Age, Age.dummy), select(impSimple$data, Age))
-
-ggplot( filter(cmpImputations, Age.dummy==T)) + geom_point(aes(x=Age, y=Age.1))
-
-```
-
 ## Custom Learners
 
 Custom Imputation methods can be written based on MakeImputeMethod. 
 
-I implemented mean by Sex:
+I implemented mean by another categorical variable:
 
 ```{r}
 
@@ -219,6 +215,16 @@ testCustom <- reimpute(test, impCustom$desc)
 unique(testCustom$Age[is.na(test$Age)])
 ```
 
+We can compare the results of the two imputation methods:
+
+```{r}
+
+cmpImputations <- data.frame(select(impRPart$data, Age, Age.dummy, Sex), select(impCustom$data, Age))
+
+ggplot( filter(cmpImputations, Age.dummy==T)) + geom_point(aes(x=Age, y=Age.1, color=Sex))+xlab("Age with RF")+ylab("Age by Sex")
+
+```
+
 ## Applying the imputation
 
 We make the imputation final and apply the same imputation also to the test data:
@@ -240,17 +246,15 @@ test <- featureEngineering(test)
 
 ```
 
+Some new built features:
+
 ```{r}
 summarizeColumns(train)
 ```
 
+# Task
 
-
-#Feature Selection
-
-It is also possible to normalize, drop and remove constant features in the data or, as we will see later, in the learning task.
-
-The main part is creating a Task that will contain the data to be used:
+The main part is creating a Task that will contain the data to be used, specifying the target variable and the value of the positive case:
 
 ```{r, Machine Learning Task}
 
@@ -267,64 +271,7 @@ test$Survived <- as.factor(0)
 
 testTask <- makeClassifTask(data = test, target = "Survived")
 
-```
-
-FeatSelControl: https://www.rdocumentation.org/packages/mlr/versions/2.10/topics/FeatSelControl
-
-Features can also be removed from the task, they are not used in training but remain in the data:
-
-```{r, Drop Features}
- 
-trainTask <- dropFeatures(task = trainTask, features = c("PassengerId","Name","LastName","Ticket","Cabin"))
-
-```
-
-## Feature Importance
-
-```{r, Variable Importance}
-
-varImp <- generateFilterValuesData(trainTask, method = c("information.gain"))
-plotFilterValues(varImp,n.show = 20)
-
-```
-
-```{r, Drop Some More Features}
- 
-filteredTask <- filterFeatures(trainTask, fval = varImp, threshold = 0.001)
-
-filteredTask
-
-```
-
-Normalize Features:
-
-```{r, Normalize}
-
-trainTask <- normalizeFeatures(trainTask, cols="Age", method = "standardize")
-testTask <- normalizeFeatures(testTask, cols="Age", method = "standardize")
-
-```
-
-```{r}
-
-summarizeColumns(trainTask$env$data[,c("Age"), drop=F])
-
-```
-
-
-# Parallelization
-
-Costly operations can be parallelized, using the parallelMap package:
-
-```{r, Parallel}
-parallelStart(mode="socket", cpus=4, level= "mlr.tuneParams") # oner or all 
-# "mlr.benchmark","mlr.resample","mlr.selectFeatures","mlr.tuneParams","mlr.ensemble"))
-
-```
-
-```{r}
-
-parallelGetRegisteredLevels()
+trainTask
 
 ```
 
@@ -353,8 +300,94 @@ getParamSet("classif.randomForest")
 ```{r, RandomForest Learner}
 
 rf <- makeLearner("classif.randomForest", predict.type = "prob")
+rf
 
 ```
+
+#Feature Selection
+
+Features can also be removed from the task, they are not used in training but remain in the data:
+
+```{r, Drop Features}
+ 
+trainTask <- dropFeatures(task = trainTask, features = c("PassengerId","Name","LastName","Ticket","Cabin"))
+trainTask
+
+```
+
+## Feature Importance
+
+```{r, Variable Importance}
+
+varImp <- generateFilterValuesData(trainTask, method = c("information.gain"))
+plotFilterValues(varImp,n.show = 20)
+
+```
+
+```{r, Drop Some More Features}
+ 
+filteredTask <- filterFeatures(trainTask, fval = varImp, threshold = 0.001)
+
+filteredTask
+
+```
+
+It is also possible to normalize and remove constant features in the learning task.
+
+```{r, Normalize}
+
+trainTask <- normalizeFeatures(trainTask, cols="Age", method = "standardize")
+testTask <- normalizeFeatures(testTask, cols="Age", method = "standardize")
+
+summarizeColumns(trainTask$env$data[,c("Age"), drop=F])
+
+```
+
+# Resampling strategy:
+
+Other methods include repeatCV, bootstrap, holdout, leave-one-out, subsampling 
+
+```{r}
+#set 3 fold cross validation
+set_cv <- makeResampleDesc("CV",iters = 3L)
+set_cv
+```
+
+# Parallelization
+
+Costly operations can be parallelized, using the parallelMap package:
+
+```{r, Parallel}
+
+parallelStart(mode="socket", cpus=4, level= "mlr.tuneParams") # oner or all 
+# "mlr.benchmark","mlr.resample","mlr.selectFeatures","mlr.tuneParams","mlr.ensemble"))
+
+```
+
+```{r}
+
+parallelGetRegisteredLevels()
+
+```
+
+## Feature Selection
+
+```{r}
+# method = "sfs" indicates that we want to conduct a sequential forward search where features are added to the model until the performance cannot be improved anymore
+
+ctrl <- makeFeatSelControlSequential(method = "sfs", alpha = 0.02)
+
+sfeats <- selectFeatures(learner = rf, task = trainTask, resampling = set_cv, control = ctrl, show.info = FALSE, measures = auc)
+
+sfeats
+```
+
+```{r}
+analyzeFeatSelResult(sfeats)
+```
+
+
+## Parameter tuning
 
 Define the parameters to be tuned, generating both continuous and discrete search spaces:
 
@@ -368,20 +401,12 @@ rf_param <- makeParamSet( makeIntegerParam("ntree", lower = 50, upper = 500),
                           makeIntegerParam("nodesize", lower = 10, upper = 50))
 ```
 
-
 How the search is going to be made (other methods include GridSearch, SimulateadAnnealing, BayesianOptimization ):
 
 ```{r}
 #let's do random search for 50 iterations
 
 ranControl <- makeTuneControlRandom(maxit = 100L)
-```
-
-Resampling strategy (other methods include repeatCV, bootstrap, holdout, leave-one-out, subsampling )
-
-```{r}
-#set 3 fold cross validation
-set_cv <- makeResampleDesc("CV",iters = 3L)
 ```
 
 Finally, we run the parameter tuning:
@@ -402,15 +427,6 @@ rf_tuneRan <- tuneParams(learner = rf,
 rf_tuneRan$y
 ```
 
-
-
-
-```{r}
-# Stop parallel execution
-parallelStop()
-```
-
-
 ```{r}
 #best parameters
 rf_tuneRan$x
@@ -419,11 +435,11 @@ rf_tuneRan$x
 The effect of the parameters can be visualized pairwise, even when we have used more than two params. A learner is specified to "extrapolate":
 
 ```{r, Params dependence}
-data <- generateHyperParsEffectData(rf_tune, partial.dep = T)
+data <- generateHyperParsEffectData(rf_tuneRan, partial.dep = T)
 
-plt <- plotHyperParsEffect(data, x = "ntree", y = "mtry", z = "acc.test.mean", plot.type = "heatmap",  partial.dep.learn = "regr.randomForest")
-min_plt = min(data$data$acc.test.mean, na.rm = TRUE)
-max_plt = max(data$data$acc.test.mean, na.rm = TRUE)
+plt <- plotHyperParsEffect(data, x = "ntree", y = "mtry", z = "auc.test.mean", plot.type = "heatmap",  partial.dep.learn = "regr.randomForest")
+min_plt = min(data$data$auc.test.mean, na.rm = TRUE)
+max_plt = max(data$data$auc.test.mean, na.rm = TRUE)
 med_plt = mean(c(min_plt, max_plt))
 plt + scale_fill_gradient2(breaks = seq(min_plt, max_plt, length.out = 5), low = "blue", mid = "white", high = "red", midpoint = med_plt)
 
@@ -433,7 +449,7 @@ The best params are then used to build the final model and calculate predictions
 
 ```{r}
 #using hyperparameters for modeling
-rf.tree <- setHyperPars(rf, par.vals = rf_tune$x)
+rf.tree <- setHyperPars(rf, par.vals = rf_tuneRan$x)
 
 #train a model
 rforest <- train(rf.tree, trainTask)
@@ -441,32 +457,34 @@ getLearnerModel(rforest)
 
 ```
 
-```{r, ROC Curve Analysis}
+```{r, Error Analysis}
 
 oob_preds <- getOOBPreds(rforest, trainTask)
 
 performance(oob_preds, auc)
-```
 
-```{r}
 df <- generateThreshVsPerfData(oob_preds, measures = list(fpr, tpr, mmce, npv))
 plotThreshVsPerf(df)
+
 ```
 
-```{r}
+```{r, ROC Curve Analysis}
 
 df <- generateThreshVsPerfData(list(train = oob_preds), measures = list(fpr, tpr))
 plotROCCurves(df)
 
 ```
 
+
+# Hyper Parameter Optimization
+
 ```{r}
 
 #des <- generateDesign(n = 10, par.set = rf_param, fun = lhs::randomLHS)
 
-mboControl <- makeMBOControl(save.on.disk.at = c(0, 5, 10, 20, 50, 75, 85, 90), save.file.path = ".")
-mboControl <- setMBOControlTermination(mboControl, iters = 90)
-mboControl <- setMBOControlInfill(mboControl, crit = makeMBOInfillCritEI())
+mboControl <- makeMBOControl()
+mboControl <- setMBOControlTermination(mboControl, iters = 15)  # in addition to the 12 initials
+mboControl <- setMBOControlInfill(mboControl, crit = makeMBOInfillCritEI()) # expected improvement
 
 tuneMBOControl <- makeTuneControlMBO(mbo.control = mboControl)
 
@@ -475,47 +493,79 @@ tuneMBOControl <- makeTuneControlMBO(mbo.control = mboControl)
 ```
 
 ```{r}
-rf_tuneMBO <- tuneParams(learner = rf, 
-                      resampling = set_cv, 
-                      task = trainTask, 
-                      par.set = rf_param, 
-                      control = tuneMBOControl, 
-                      measures = auc)
 
+inner <- makeResampleDesc("Subsample", iters = 3 )
+
+lrn <- makeTuneWrapper(learner=rf, resampling = inner, par.set = rf_param, control = tuneMBOControl, show.info = FALSE)
+
+outer <- makeResampleDesc("CV", iters = 3)
+
+r <- resample(learner = lrn, 
+              resampling = outer,
+              extract = getTuneResult,
+              task = trainTask, 
+              measures = auc)
+r
 ```
 
 ```{r}
-#cv accuracy
-rf_tuneMBO$y
+r
+r$measures.test
 ```
 
 ```{r}
 #best parameters
-rf_tuneMBO$x
+r$extract
+```
+
+```{r}
+opt.paths = getNestedTuneResultsOptPathDf(r)
+head(opt.paths, 40)
+```
+
+```{r}
+ getNestedTuneResultsX(r)
 ```
 
 
+# Comparing Models
+
+```{r}
+
+outer <- makeResampleDesc("Subsample", iter = 3)
+res <- benchmark(tasks = trainTask, 
+                 learners = list(lrn, rf), 
+                 resampling = outer, 
+                 show.info = FALSE,
+                 measures = auc)
+res
+
+```
+
+
+```{r}
+
+getBMRPerformances(res, as.df = TRUE)
+
+```
+
+# Finally, once you have got the model to be used:
 
 Make final predictions on the test data set:
 
 ```{r}
 
+# make sure the factors have the same Levels
+
 testTask$env$data <- checkLevels(trainTask$env$data, testTask$env$data)
 
-```
-
-
-```{r}
 rfmodel <- predict(rforest, testTask)
 
 rfmodel
 
 ```
 
-2nd model
-Stacking
-
-mlrHyperOpt
-
-https://mlr-org.github.io/Parameter-tuning-with-mlrHyperopt/
-
+```{r}
+# Stop parallel execution
+parallelStop()
+```
