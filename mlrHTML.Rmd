@@ -41,7 +41,6 @@ options(width = 200)
 ## What can Automatic Machine Learning do
 
 - <b>Exploratory data analysis</b>
-- <b>Problem identification</b>
 - <b>Data cleaning:</b> missing values, outliers
 - <b>Feature selection:</b> redundant, not informative
 - <b>Feature engineering</b>
@@ -62,8 +61,9 @@ options(width = 200)
 - Python, scikit-learn framework
 - Extensible
 - Calculate 38 meta-features on 140 datasets, about data characteristics: sample size, skewnewss, classes
-- The distance of a new dataset to this 140 datasets will be measured
-- The 25 closest used in a Bayesian Optimization to find the best instantiation
+- The distance of a new dataset to this 140 datasets will be measured.
+- 25-KNN?
+- The 25 closest used in a Bayesian Optimization to find the best instantiation 
 - Winner of the [ChaLearn AutoML challenge](http://automl.chalearn.org/) 
 - [NIPS Paper](http://papers.nips.cc/paper/5872-efficient-and-robust-automated-machine-learning.pdf)
 
@@ -109,7 +109,7 @@ There are solutions that <b>claim</b> can convert data to personalised stories a
 
   <img alt="Data" src=automl-figure/narrativescience.PNG height=400>
   
-  Store 9 your sales of item 6 are far below other stores in your region. If you are able to up your sales by only 5 units a day, you will be able to increase your profits by $1,123. The sales of this product for other stores in your region seem to indicate that this is completely achievable.
+  Store 9, your sales of item 6 are far below other stores in your region. If you are able to up your sales by only 5 units a day, you will be able to increase your profits by $1,123. The sales of this product for other stores in your region seem to indicate that this is completely achievable.
 
 # R packages for Automatic Machine Learning
 
@@ -217,7 +217,7 @@ Source: (H20)[http://h2o-release.s3.amazonaws.com/h2o/master/3888/docs-website/h
 
 ## CARET
 
-- Short for _C_lassification _A_nd _RE_gression _T_raining).
+- Short for Classification And REgression Training.
 - Documented extensively: [book Applied Predictive Modelling](http://www.springer.com/gp/book/9781461468486), a [paper](https://www.jstatsoft.org/article/view/v028i05) and a [Datacamp training](https://www.datacamp.com/courses/machine-learning-toolbox).
 - Focused on less steps of the processing pipeline:
 - data splitting
@@ -236,7 +236,6 @@ Source: (H20)[http://h2o-release.s3.amazonaws.com/h2o/master/3888/docs-website/h
 ## Sources about MLR
 
 I have mixed material from the [MLR package](https://cran.r-project.org/web/packages/mlr/index.html), its [Tutorials](https://mlr-org.github.io/mlr-tutorial/devel/html/) and also from [Blogs](https://www.analyticsvidhya.com/blog/2016/08/practicing-machine-learning-techniques-in-r-with-mlr-package/).
-The data used is about the approval of Loan applications, classification problem, and is the data used in the [Analytics Vidhya post](https://www.analyticsvidhya.com/blog/2016/08/practicing-machine-learning-techniques-in-r-with-mlr-package/)
 
 # End of Part I
 

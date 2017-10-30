@@ -1,8 +1,14 @@
 ---
 title: "mlr"
-author: Jose Magana
-output: html_notebook
+author: "Jose Magana"
+output:
+  html_document: default
+  html_notebook: default
 ---
+
+```{r, echo=F}
+options(width = 200)
+```
 
 ```{r}
 library(mlr)
@@ -559,7 +565,7 @@ Make final predictions on the test data set:
 
 testTask$env$data <- checkLevels(trainTask$env$data, testTask$env$data)
 
-rfmodel <- predict(rforest, testTask)
+rfmodel <- predict(res$results$train$classif.randomForest.tuned$models[[3]], testTask)
 
 rfmodel
 
