@@ -125,16 +125,25 @@ impSimple <- impute(train,
               dummy.cols = c("Age"), 
               dummy.type = "numeric")
 
+```
+
+The object return by impute has two parts, data that contains the new data:
+
+```{r}
+
 summarizeColumns(impSimple$data[,c("Embarked","Age","Age.dummy")])
 
 ```
 
-The object return by impute has two parts, data that contains the new data an desc that contains
+And desc that contains the params of the imputation:
 
 ```{r}
 
-# Careful, dummy is integer, unexpected result...use as.logical
-unique(impSimple$data$Age[as.logical(impSimple$data$Age.dummy)])
+impSimple$desc$impute$Age
+
+```
+
+```{r}
 
 testSimple<-reimpute(test,impSimple$desc)
 
@@ -147,12 +156,14 @@ unique(testSimple$Age[is.na(test$Age)])
 We can also impute all variables depending on their type:
 
 ```{r}
+
 impType <- impute(train, 
                   classes = list(numeric = imputeMean()),
                   dummy.classes = c("numeric"), 
                   dummy.type = "numeric")
 
 summarizeColumns(impType$data[,c("Age","Age.dummy"), drop=F])
+
 ```
 
 ## Using a learner
@@ -380,8 +391,8 @@ parallelGetRegisteredLevels()
 
 ```{r}
 # method = "sfs" indicates that we want to conduct a sequential forward search where features are added to the model until the performance cannot be improved anymore
-
-ctrl <- makeFeatSelControlSequential(method = "sfs", alpha = 0.02)
+set.seed(0)
+ctrl <- makeFeatSelControlSequential(method = "sfs", alpha = 0.01)
 
 sfeats <- selectFeatures(learner = rf, task = trainTask, resampling = set_cv, control = ctrl, show.info = FALSE, measures = auc)
 
@@ -412,13 +423,13 @@ How the search is going to be made (other methods include GridSearch, Simulatead
 ```{r}
 #let's do random search for 50 iterations
 
-ranControl <- makeTuneControlRandom(maxit = 100L)
+ranControl <- makeTuneControlRandom(maxit = 50L)
 ```
 
 Finally, we run the parameter tuning:
 
 ```{r}
-
+set.seed(0)
 rf_tuneRan <- tuneParams(learner = rf, 
                       resampling = set_cv, 
                       task = trainTask, 
@@ -467,8 +478,6 @@ getLearnerModel(rforest)
 
 oob_preds <- getOOBPreds(rforest, trainTask)
 
-performance(oob_preds, auc)
-
 df <- generateThreshVsPerfData(oob_preds, measures = list(fpr, tpr, mmce, npv))
 plotThreshVsPerf(df)
 
@@ -479,18 +488,22 @@ plotThreshVsPerf(df)
 df <- generateThreshVsPerfData(list(train = oob_preds), measures = list(fpr, tpr))
 plotROCCurves(df)
 
-```
 
+```
+```{r}
+performance(oob_preds, auc)
+```
 
 # Hyper Parameter Optimization
 
-```{r}
 
-#des <- generateDesign(n = 10, par.set = rf_param, fun = lhs::randomLHS)
+![Hyper Parameter Optimization](./automl-figure/animation-.gif)
+
+```{r}
 
 mboControl <- makeMBOControl()
 mboControl <- setMBOControlTermination(mboControl, iters = 15)  # in addition to the 12 initials
-mboControl <- setMBOControlInfill(mboControl, crit = makeMBOInfillCritEI()) # expected improvement
+mboControl <- setMBOControlInfill(mboControl, crit = makeMBOInfillCritAEI()) # expected improvement
 
 tuneMBOControl <- makeTuneControlMBO(mbo.control = mboControl)
 
@@ -498,62 +511,97 @@ tuneMBOControl <- makeTuneControlMBO(mbo.control = mboControl)
 
 ```
 
-```{r}
+```{r, results='asis'}
 
-inner <- makeResampleDesc("Subsample", iters = 3 )
-
-lrn <- makeTuneWrapper(learner=rf, resampling = inner, par.set = rf_param, control = tuneMBOControl, show.info = FALSE)
+set.seed(0)
 
 outer <- makeResampleDesc("CV", iters = 3)
 
-r <- resample(learner = lrn, 
-              resampling = outer,
-              extract = getTuneResult,
-              task = trainTask, 
-              measures = auc)
-r
-```
+resTune <- tuneParams(learner=rf, 
+                resampling = outer, 
+                task=trainTask, 
+                measures=auc, 
+                par.set = rf_param, 
+                control = tuneMBOControl, 
+                show.info = )
 
-```{r}
-r
-r$measures.test
+resTune
 ```
-
-```{r}
-#best parameters
-r$extract
-```
-
-```{r}
-opt.paths = getNestedTuneResultsOptPathDf(r)
-head(opt.paths, 40)
-```
-
-```{r}
- getNestedTuneResultsX(r)
-```
-
 
 # Comparing Models
 
 ```{r}
 
 outer <- makeResampleDesc("Subsample", iter = 3)
-res <- benchmark(tasks = trainTask, 
+
+lrn <- makeFeatSelWrapper(learner = rf, 
+                           resampling = outer, 
+                           measures = auc, 
+                           control = ctrl)
+
+resBMR <- benchmark(tasks = trainTask, 
                  learners = list(lrn, rf), 
                  resampling = outer, 
                  show.info = FALSE,
                  measures = auc)
-res
+resBMR
 
 ```
 
 
 ```{r}
 
-getBMRPerformances(res, as.df = TRUE)
+getBMRPerformances(resBMR, as.df = TRUE)
 
 ```
+
+# Putting all together
+
+If I am not mislead not all combinations are possible... like Tune Params and Feature Selection... if all the parameters are to be recovered, because only benchmark and resample allow the detailed results collection.  TBC
+
+```{r}
+
+set.seed(0)
+
+ctrl <- makeFeatSelControlSequential(method="sfs")
+
+inner <- makeResampleDesc("Subsample", iters = 3)
+
+lrn <- makeFeatSelWrapper(learner = rf, 
+                           resampling = inner, 
+                           measures = auc, 
+                           control = ctrl)
+
+outer <- makeResampleDesc("CV", iters = 3)
+
+resFull <- benchmark(task = trainTask, 
+               learners = list(lrn, rf), 
+               resampling = outer,
+               measures = auc,
+               show.info = F)
+
+resFull
+```
+
+```{r}
+resFull$results
+```
+
+```{r}
+getBMRFeatSelResults(resFull)
+```
+
+```{r}
+
+feats <- getBMRFeatSelResults(resFull, learner.id = "classif.randomForest.featsel", drop = TRUE)
+
+opt.paths <- lapply(feats, function(x) as.data.frame(x$opt.path))
+head(opt.paths[[1]])
+```
+
+```{r}
+analyzeFeatSelResult(feats[[1]])
+``` 
 
 # Finally, once you have got the model to be used:
 
@@ -565,7 +613,7 @@ Make final predictions on the test data set:
 
 testTask$env$data <- checkLevels(trainTask$env$data, testTask$env$data)
 
-rfmodel <- predict(res$results$train$classif.randomForest.tuned$models[[3]], testTask)
+rfmodel <- predict(rforest, testTask)
 
 rfmodel
 
