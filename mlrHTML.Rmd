@@ -27,12 +27,14 @@ options(width = 200)
 
 ## What is the purpose
 
-- Automatic Machine Learning is NOT Automatic Data Science, many tools advertise as Automating Data Science but they don't!!
-- <b>To date</b>, there is no production level algorithm that can translate a business need expressed in natural language to an algorithm.
+- Search configuration that provides the more effective predictive models.
+- Require less code to generate those models.
+- Allow quick iteration given different problem frames.
 - Free time dedicated to routine low value tasks ( 2 out of [the 4D's](https://www.forbes.com/sites/bernardmarr/2017/10/16/the-4-ds-of-robotization-dull-dirty-dangerous-and-dear): Dull and Dirty)
-- Support Data Scientists, not replace them. 
-- Allow quick iteration given different problem frames 
 - Hot research topic
+- Support Data Scientists, not replace them. 
+- Automatic Machine Learning is NOT Automatic Data Science,
+- <b>To date</b>, there is no production level algorithm that can translate a business need expressed in natural language to an algorithm.
 
 <img src=./automl-figure/computers-algorithm-big_data-data_science-data_analytics-job_loss-jcen1731_low.jpg
  height=300>
@@ -43,7 +45,7 @@ options(width = 200)
 - <b>Data cleaning:</b> missing values, outliers
 - <b>Feature selection:</b> redundant, not informative
 - <b>Feature engineering</b>
-- <b>Data separation</b>: T/V/T
+- <b>Data separation</b>: Training / Validation / Test
 - <b>Model selection</b>
 - <b>Model composition:</b> ensembling, stacking
 - <b>Hyperparameter optimization</b>
@@ -58,8 +60,7 @@ options(width = 200)
 ## Auto sklearn
 
 - Python, scikit-learn framework
-- Extensible
-- For each of 140 datasets (training set), 38 meta-features are calculated on data characteristics: sample size, skewnewss, classes, entropy, ...
+- For each of 140 datasets (training set), 38 meta-features are calculated on data characteristics: sample size, skewness, classes, entropy, ...
 - Run SMAC, to find the best ML model for each
 - The distance of a new dataset to this 140 datasets will be measured.
 - The ML solutions of the 25 closest are used in a Bayesian Optimization to find the best instantiation
@@ -88,7 +89,7 @@ options(width = 200)
 
 - [Data Robot](https://www.datarobot.com/) 
 <img src=automl-figure/datarobot.png height=250>
-- [Skytree](http://www.skytree.net) 
+- [Skytree](http://www.skytree.net/products/) 
 <img src=automl-figure/skytree.png height=250>
 - [Automatic Statistician](https://www.automaticstatistician.com) (for Exploratory Data Analysis)
  
@@ -115,7 +116,7 @@ There are solutions that <b>claim</b> can convert data to personalised stories a
 
 ## The main packages
 
-- H2O (also Python, Java and Scala)
+- [H2O](https://www.h2o.ai/h2o/) (also Python, Java and Scala)
 - Caret 
 - MLR
 - Do you know any other?
@@ -252,6 +253,8 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 
+## What is Hyper Parameter Model Based Optimization
 
+<img src=./automl-figure/animation-.gif height=600>
 
 
