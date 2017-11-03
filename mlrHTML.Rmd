@@ -4,7 +4,7 @@ author: Jose Magana
 date: 2 Nov 2017
 output:
   revealjs::revealjs_presentation:
-    theme: black
+    theme: white
     highlight: zenburn
     center: true
     transition: slide
@@ -30,12 +30,10 @@ options(width = 200)
 - Search configuration that provides the more effective predictive models.
 - Require less code to generate those models.
 - Allow quick iteration given different problem frames.
-- Free time dedicated to routine low value tasks ( 2 out of [the 4D's](https://www.forbes.com/sites/bernardmarr/2017/10/16/the-4-ds-of-robotization-dull-dirty-dangerous-and-dear): Dull and Dirty)
-- Hot research topic
-- Support Data Scientists, not replace them. 
-- Automatic Machine Learning is NOT Automatic Data Science,
+- Free time dedicated to low value tasks (2 out of [the 4D's](https://www.forbes.com/sites/bernardmarr/2017/10/16/the-4-ds-of-robotization-dull-dirty-dangerous-and-dear): Dull and Dirty)
+- Assisted/Streamlined Machine Learning, NOT Automatic Data Science
 - <b>To date</b>, there is no production level algorithm that can translate a business need expressed in natural language to an algorithm.
-
+- Hot research topic
 <img src=./automl-figure/computers-algorithm-big_data-data_science-data_analytics-job_loss-jcen1731_low.jpg
  height=300>
 
@@ -95,10 +93,9 @@ options(width = 200)
 <img src=automl-figure/datarobot.png height=250>
 - [Skytree](http://www.skytree.net/products/) 
 <img src=automl-figure/skytree.png height=250>
-- [Automatic Statistician](https://www.automaticstatistician.com) (for Exploratory Data Analysis)
- 
- Examples: [Airline](https://www.automaticstatistician.com/static/abcdoutput/01-airline.pdf)
-          & [Affairs](file:///auto-report-affairs.pdf)
+- [Automatic Statistician](https://www.automaticstatistician.com) (for Exploratory Data Analysis): [Airline](https://www.automaticstatistician.com/static/abcdoutput/01-airline.pdf) & [Affairs](file:///auto-report-affairs.pdf)
+- [IBM Data Science Experience](https://datascience.ibm.com/)
+- [SparkBeyond](http://www.sparkbeyond.com/)
           
 ## Towards Skynet: Google AutoML
 
@@ -240,6 +237,14 @@ e. variable importance estimation
 - Documentation: [MLR package](https://cran.r-project.org/web/packages/mlr/index.html), [Tutorials](https://mlr-org.github.io/mlr-tutorial/devel/html/) 
 
 # End of Part I
+
+# Conclusions
+
+## 
+
+-A
+-B
+-C
 
 ## License
 

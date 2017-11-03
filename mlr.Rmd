@@ -7,7 +7,7 @@ output:
 ---
 
 ```{r, echo=F}
-options(width = 200)
+options(width = 120)
 ```
 
 ```{r}
@@ -18,6 +18,7 @@ library(data.table)
 library(dtplyr)
 library(dplyr)
 library(mlrMBO)
+library(magrittr)
 
 source("utils.R")
 ```
@@ -78,8 +79,6 @@ summarizeLevels(subset(train,select=-c(PassengerId, Name, Ticket, Cabin, LastNam
 ```{r}
 summarizeColumns(train)
 ```
-
-
 ## Filter outliers
 
 ```{r, View outliers}
@@ -88,17 +87,11 @@ ggplot(train)+geom_histogram(aes(x=Fare),binwidth=20)
 
 ```
 
-
 ```{r, Filter outliers}
 
 thr <- 300
-
 train <- capLargeValues(train, cols = c("Fare"), threshold = thr)
 test <- capLargeValues(test, cols = c("Fare"), threshold = thr)
-
-```
-
-```{r, Check outliers}
 
 ggplot(train)+geom_histogram(aes(x=Fare),binwidth=20)
 
@@ -143,26 +136,17 @@ impSimple$desc$impute$Age
 
 ```
 
-```{r}
-
-testSimple<-reimpute(test,impSimple$desc)
-
-unique(testSimple$Age[is.na(test$Age)])
-
-```
-
 ## Type based
 
 We can also impute all variables depending on their type:
 
-```{r}
+```{r, eval=F}
+
+# Type based
 
 impType <- impute(train, 
                   classes = list(numeric = imputeMean()),
-                  dummy.classes = c("numeric"), 
-                  dummy.type = "numeric")
-
-summarizeColumns(impType$data[,c("Age","Age.dummy"), drop=F])
+                  dummy.classes = c("numeric"),  dummy.type = "numeric")
 
 ```
 
@@ -183,9 +167,7 @@ impRPart <- impute(train[,c(-1)],
 
 ## Custom Learners
 
-Custom Imputation methods can be written based on MakeImputeMethod. 
-
-I implemented mean by another categorical variable:
+Custom Imputation methods can be written based on MakeImputeMethod. I implemented mean grouped by another categorical variable:
 
 ```{r}
 
@@ -201,10 +183,8 @@ imputeByCategory <- function( feature ) {
     return(list(values=values, var=var))
   }, 
   impute= function(data, target, col, values, var) {
-    
     x <- data[[col]] 
     ed <- data[[var]][is.na(x)]
-    
     nv <- sapply(ed, function(y) {  # this sapply is not needed...
       values %>% 
         filter_(paste0(var,' == "', y, '"') ) %>% 
@@ -213,7 +193,6 @@ imputeByCategory <- function( feature ) {
         unname } ) 
     
     replace(x, is.na(x), nv)
-    
   }, 
   args  = list(var=feature)
   )
@@ -223,29 +202,12 @@ impCustom <- impute(train, cols=list(Age=imputeByCategory("Sex")), dummy.cols = 
 
 ```
 
-```{r}
-unique(impCustom$data$Age[as.logical(impCustom$data$Age.dummy)])
-
-testCustom <- reimpute(test, impCustom$desc)
-
-unique(testCustom$Age[is.na(test$Age)])
-```
-
-We can compare the results of the two imputation methods:
-
-```{r}
-
-cmpImputations <- data.frame(select(impRPart$data, Age, Age.dummy, Sex), select(impCustom$data, Age))
-
-ggplot( filter(cmpImputations, Age.dummy==T)) + geom_point(aes(x=Age, y=Age.1, color=Sex))+xlab("Age with RF")+ylab("Age by Sex")
-
-```
-
 ## Applying the imputation
 
 We make the imputation final and apply the same imputation also to the test data:
 
 ```{r}
+
 train <- impSimple$data
 
 test <- reimpute(test, impSimple$desc) # this contains the imputation algorithm
@@ -256,13 +218,34 @@ summarizeColumns(test)
 #Feature engineering
 
 ```{r, Feature Engineering}
+train <- fread("train.csv", na.strings = c(""," ","<NA>",NA), 
+               colClasses = c("factor","logical","factor","character","factor","numeric","integer","integer","character","numeric","character","factor") )
+
+test <- fread("test.csv", na.strings = c(""," ","<NA>",NA),
+              colClasses=c("factor","factor","character","factor","numeric","integer","integer","character","numeric","character","factor"))
+
+train <- preprocess(train) # take care of names, cabins
+test <- preprocess(test)
+
+train <- as.data.frame(train)  # some issues working with data.table
+test <- as.data.frame(test)
+thr <- 300
+train <- capLargeValues(train, cols = c("Fare"), threshold = thr)
+test <- capLargeValues(test, cols = c("Fare"), threshold = thr)
+impSimple <- impute(train, 
+              cols = list(Embarked = imputeMode(), Age = imputeMean()), 
+              dummy.cols = c("Age"), 
+              dummy.type = "numeric")
+train <- impSimple$data
+
+test <- reimpute(test, impSimple$desc) # this contains the imputation algorithm
 
 train <- featureEngineering(train)
 test <- featureEngineering(test)
 
 ```
 
-Some new built features:
+Some new built features (Child, FamilySize,Nobility):
 
 ```{r}
 summarizeColumns(train)
@@ -304,6 +287,8 @@ setDT(lstLearners)
 lstLearners
 ```
 
+Supports:
+
 84 Classifiers
 64 Regression
 15 Survival
@@ -319,10 +304,8 @@ getParamSet("classif.randomForest")
 
 
 ```{r, RandomForest Learner}
-
 rf <- makeLearner("classif.randomForest", predict.type = "prob")
 rf
-
 ```
 
 #Feature Selection
@@ -330,10 +313,8 @@ rf
 Features can also be removed from the task, they are not used in training but remain in the data:
 
 ```{r, Drop Features}
- 
 trainTask <- dropFeatures(task = trainTask, features = c("PassengerId","Name","LastName","Ticket","Cabin"))
 trainTask
-
 ```
 
 ## Feature Importance
@@ -376,7 +357,12 @@ set_cv
 
 # Parallelization
 
-Costly operations can be parallelized, using the parallelMap package:
+Costly operations can be parallelized, using the parallelMap package.
+Supports multiple backend:
+- local multicore execution using parallel, 
+- socket and MPI clusters using snow, 
+- makeshift SSH-clusters using BatchJobs and 
+- high performance computing clusters (managed by a scheduler like SLURM, Torque/PBS, SGE or LSF) also using BatchJobs
 
 ```{r, Parallel}
 parallelGetRegisteredLevels()
@@ -440,7 +426,6 @@ rf_tuneRan <- tuneParams(learner = rf,
                       par.set = rf_param, 
                       control = ranControl, 
                       measures = auc)
-
 ```
 
 ```{r}
@@ -457,13 +442,11 @@ The effect of the parameters can be visualized pairwise, even when we have used 
 
 ```{r, Params dependence}
 data <- generateHyperParsEffectData(rf_tuneRan, partial.dep = T)
-
 plt <- plotHyperParsEffect(data, x = "ntree", y = "mtry", z = "auc.test.mean", plot.type = "heatmap",  partial.dep.learn = "regr.randomForest")
 min_plt = min(data$data$auc.test.mean, na.rm = TRUE)
 max_plt = max(data$data$auc.test.mean, na.rm = TRUE)
 med_plt = mean(c(min_plt, max_plt))
 plt + scale_fill_gradient2(breaks = seq(min_plt, max_plt, length.out = 5), low = "blue", mid = "white", high = "red", midpoint = med_plt)
-
 ```
 
 The best params are then used to build the final model and calculate predictions:
@@ -471,27 +454,20 @@ The best params are then used to build the final model and calculate predictions
 ```{r}
 #using hyperparameters for modeling
 rf.tree <- setHyperPars(rf, par.vals = rf_tuneRan$x) # delete
-
 #train a model
 rforest <- train(rf.tree, trainTask)
 getLearnerModel(rforest)
-
 ```
 
 ```{r, Error Analysis}
-
 oob_preds <- getOOBPreds(rforest, trainTask)
-
 df <- generateThreshVsPerfData(oob_preds, measures = list(fpr, tpr, mmce, npv))
 plotThreshVsPerf(df)
-
 ```
 
 ```{r, ROC Curve Analysis}
-
 df <- generateThreshVsPerfData(list(train = oob_preds), measures = list(fpr, tpr))
 plotROCCurves(df)
-
 ```
 ```{r}
 performance(oob_preds, auc)
@@ -506,27 +482,19 @@ Balance explotation/exploration
 ![Hyper Parameter Optimization - Setup](./automl-figure/Iter1.png)
 
 ![Hyper Parameter Optimization](./automl-figure/animation-.gif)
-
 ```{r}
-
 # mlrMBO part
 mboControl <- makeMBOControl()
 mboControl <- setMBOControlTermination(mboControl, iters = 15)  # in addition to the 12 initials
 mboControl <- setMBOControlInfill(mboControl, crit = makeMBOInfillCritAEI()) # augmented expected improvement
-
 # mlr part
 tuneMBOControl <- makeTuneControlMBO(mbo.control = mboControl)
-
 #run <- exampleRun(obj.fun, learner = rf, control = mboControl, show.info = FALSE)
-
 ```
 
 ```{r, results='asis'}
-
 set.seed(0)
-
 outer <- makeResampleDesc("CV", iters = 3)
-
 resTune <- tuneParams(learner=rf, 
                 resampling = outer, 
                 task=trainTask, 
@@ -534,41 +502,31 @@ resTune <- tuneParams(learner=rf,
                 par.set = rf_param, 
                 control = tuneMBOControl, 
                 show.info = F)
-
 ```
-
-
 ```{r}
 resTune
 ```
 # Comparing Models
 
 ```{r}
-
 outer <- makeResampleDesc("Subsample", iter = 3)
-
 lrn <- makeFeatSelWrapper(learner = rf, 
                            resampling = outer, 
                            measures = auc, 
                            control = ctrl)
-
 resBMR <- benchmark(tasks = trainTask, 
                    learners = list(lrn, rf), 
                    resampling = outer, 
                    show.info = FALSE,
                    measures = auc)
-
 ```
 
 ```{r}
 resBMR
-
 ```
 
 ```{r}
-
 getBMRPerformances(resBMR, as.df = TRUE)
-
 ```
 
 # Putting all together
@@ -576,28 +534,34 @@ getBMRPerformances(resBMR, as.df = TRUE)
 Note to self(TBC): If I am not mislead not all combinations are possible... like Tune Params and Feature Selection... if all the parameters are to be recovered, because only benchmark and resample allow the detailed results collection. 
 
 ```{r}
-
+rm(list=ls())
+source("utils.R")
+varTypes <- c("factor","character","factor","numeric","integer","integer","character","numeric","character","factor")
+train <- fread("train.csv", na.strings = c(""," ","<NA>",NA), colClasses = c("factor","logical",varTypes) )
+test <- fread("test.csv", na.strings = c(""," ","<NA>",NA), colClasses=c("factor",varTypes) )
+train <- train %>% preprocess %>% as.data.frame
+test <- test %>% preprocess %>% as.data.frame
+thr <- 300
+train <- capLargeValues(train, cols = c("Fare"), threshold = thr)
+test <- capLargeValues(test, cols = c("Fare"), threshold = thr)
+impSimple <- impute(train, cols = list(Embarked = imputeMode(), Age = imputeMean()), dummy.cols = c("Age"), dummy.type = "numeric")
+train <- impSimple$data
+test <- reimpute(test, impSimple$desc) # this contains the imputation algorithm
+train <- train %>% featureEngineering %>% reType
+test <- test %>% featureEngineering %>% reType
+trainTask <- makeClassifTask(data = train, target = "Survived", positive = "1")
+test$Survived <- as.factor(0)
+testTask <- makeClassifTask(data = test, target = "Survived")
+trainTask <- dropFeatures(task = trainTask, features = c("PassengerId","Name","LastName","Ticket","Cabin"))
+rf <- makeLearner("classif.randomForest", predict.type = "prob") 
 set.seed(0)
-
 ctrl <- makeFeatSelControlSequential(method="sfs")
-
 inner <- makeResampleDesc("Subsample", iters = 3)
-
-lrn <- makeFeatSelWrapper(learner = rf, 
-                           resampling = inner, 
-                           measures = auc, 
-                           control = ctrl)
-
+lrn <- makeFeatSelWrapper(learner = rf, resampling = inner, measures = auc, control = ctrl)
 outer <- makeResampleDesc("CV", iters = 3)
-
-resFull <- benchmark(task = trainTask, 
-               learners = list(lrn, rf), 
-               resampling = outer,
-               measures = auc,
-               show.info = F)
-
-resFull
+resFull <- benchmark(task = trainTask, learners = list(lrn, rf), resampling = outer, measures = auc, show.info = F)
 ```
+
 ```{r}
 resFull
 ```
@@ -611,9 +575,7 @@ getBMRFeatSelResults(resFull)
 ```
 
 ```{r}
-
 feats <- getBMRFeatSelResults(resFull, learner.id = "classif.randomForest.featsel", drop = TRUE)
-
 opt.paths <- lapply(feats, function(x) as.data.frame(x$opt.path))
 head(opt.paths[[1]])
 ```
@@ -627,15 +589,10 @@ analyzeFeatSelResult(feats[[1]])
 Make final predictions on the test data set:
 
 ```{r}
-
 # make sure the factors have the same Levels
-
 testTask$env$data <- checkLevels(trainTask$env$data, testTask$env$data)
-
 rfmodel <- predict(rforest, testTask)
-
 rfmodel
-
 ```
 
 ```{r}
