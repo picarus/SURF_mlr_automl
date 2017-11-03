@@ -85,6 +85,10 @@ options(width = 200)
 - [AUTOWEKA](http://www.cs.ubc.ca/labs/beta/Projects/autoweka/)(Java/GUI)
 - [Sequential Model-based Algorithm Configuration(SMAC)](https://github.com/automl/SMAC3): Used by autoML for Hyperparameter optimization
 
+## Assisted Data Cleaning: OpenRefine(by Google)
+
+<img src=automl-figure/OpenRefine.PNG height=600>
+
 ## Commercial (Far from exhaustive)
 
 - [Data Robot](https://www.datarobot.com/) 
@@ -95,7 +99,7 @@ options(width = 200)
  
  Examples: [Airline](https://www.automaticstatistician.com/static/abcdoutput/01-airline.pdf)
           & [Affairs](file:///auto-report-affairs.pdf)
-  
+          
 ## Towards Skynet: Google AutoML
 
 <img src=automl-figure/googleMLlarge.PNG height=300>
