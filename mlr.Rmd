@@ -123,17 +123,13 @@ impSimple <- impute(train,
 The object returned by impute has two parts, "data" that contains the transformed data:
 
 ```{r}
-
 summarizeColumns(impSimple$data[,c("Embarked","Age","Age.dummy")])
-
 ```
 
 And desc that contains the parameters of the imputation:
 
 ```{r}
-
 impSimple$desc$impute$Age
-
 ```
 
 ## Type based
@@ -207,7 +203,6 @@ impCustom <- impute(train, cols=list(Age=imputeByCategory("Sex")), dummy.cols = 
 We make the imputation final and apply the same imputation also to the test data:
 
 ```{r}
-
 train <- impSimple$data
 
 test <- reimpute(test, impSimple$desc) # this contains the imputation algorithm
@@ -218,31 +213,8 @@ summarizeColumns(test)
 #Feature engineering
 
 ```{r, Feature Engineering}
-train <- fread("train.csv", na.strings = c(""," ","<NA>",NA), 
-               colClasses = c("factor","logical","factor","character","factor","numeric","integer","integer","character","numeric","character","factor") )
-
-test <- fread("test.csv", na.strings = c(""," ","<NA>",NA),
-              colClasses=c("factor","factor","character","factor","numeric","integer","integer","character","numeric","character","factor"))
-
-train <- preprocess(train) # take care of names, cabins
-test <- preprocess(test)
-
-train <- as.data.frame(train)  # some issues working with data.table
-test <- as.data.frame(test)
-thr <- 300
-train <- capLargeValues(train, cols = c("Fare"), threshold = thr)
-test <- capLargeValues(test, cols = c("Fare"), threshold = thr)
-impSimple <- impute(train, 
-              cols = list(Embarked = imputeMode(), Age = imputeMean()), 
-              dummy.cols = c("Age"), 
-              dummy.type = "numeric")
-train <- impSimple$data
-
-test <- reimpute(test, impSimple$desc) # this contains the imputation algorithm
-
 train <- featureEngineering(train)
 test <- featureEngineering(test)
-
 ```
 
 Some new built features (Child, FamilySize,Nobility):
@@ -277,9 +249,7 @@ trainTask
 # Learners
 
 ```{r, Learners List}
-
 lstLearners <- listLearners("classif")
-
 ```
 
 ```{r}
@@ -297,17 +267,12 @@ Supports:
 ## Learning about the parameters
 
 ```{r, Training RandomForest}
-
 getParamSet("classif.randomForest")
-
 ```
-
-
 ```{r, RandomForest Learner}
 rf <- makeLearner("classif.randomForest", predict.type = "prob")
 rf
 ```
-
 #Feature Selection
 
 Features can also be removed from the task, they are not used in training but remain in the data:
@@ -316,35 +281,26 @@ Features can also be removed from the task, they are not used in training but re
 trainTask <- dropFeatures(task = trainTask, features = c("PassengerId","Name","LastName","Ticket","Cabin"))
 trainTask
 ```
-
 ## Feature Importance
 
 ```{r, Variable Importance}
-
 varImp <- generateFilterValuesData(trainTask, method = c("information.gain"))
 plotFilterValues(varImp,n.show = 20)
-
 ```
 
 ```{r, Drop Some More Features}
- 
 filteredTask <- filterFeatures(trainTask, fval = varImp, threshold = 0.001)
-
 filteredTask
-
 ```
 
 It is also possible to normalize and remove constant features in the learning task.
 
 ```{r, Normalize}
-
 trainTask <- normalizeFeatures(trainTask, cols="Age", method = "standardize")
 testTask <- normalizeFeatures(testTask, cols="Age", method = "standardize")
 
 summarizeColumns(trainTask$env$data[,c("Age"), drop=F])
-
 ```
-
 # Resampling strategy:
 
 Other methods include repeatCV, bootstrap, holdout, leave-one-out, subsampling :
@@ -409,11 +365,8 @@ rf_param <- makeParamSet( makeIntegerParam("ntree", lower = 50, upper = 500),
 How the search is going to be made (other methods include GridSearch, SimulateadAnnealing, BayesianOptimization ):
 
 ```{r}
-
 #let's do random search for 50 iterations
-
 ranControl <- makeTuneControlRandom(maxit = 50L)
-
 ```
 
 Finally, we run the parameter tuning:
@@ -453,7 +406,7 @@ The best params are then used to build the final model and calculate predictions
 
 ```{r}
 #using hyperparameters for modeling
-rf.tree <- setHyperPars(rf, par.vals = rf_tuneRan$x) # delete
+rf.tree <- setHyperPars(rf, par.vals = rf_tuneRan$x) 
 #train a model
 rforest <- train(rf.tree, trainTask)
 getLearnerModel(rforest)
@@ -485,7 +438,7 @@ Balance explotation/exploration
 ```{r}
 # mlrMBO part
 mboControl <- makeMBOControl()
-mboControl <- setMBOControlTermination(mboControl, iters = 15)  # in addition to the 12 initials
+mboControl <- setMBOControlTermination(mboControl, iters = 15)  # in addition to the initials
 mboControl <- setMBOControlInfill(mboControl, crit = makeMBOInfillCritAEI()) # augmented expected improvement
 # mlr part
 tuneMBOControl <- makeTuneControlMBO(mbo.control = mboControl)
@@ -527,6 +480,17 @@ resBMR
 
 ```{r}
 getBMRPerformances(resBMR, as.df = TRUE)
+```
+
+# Finally, once you have got the model to be used:
+
+Make final predictions on the test data set:
+
+```{r}
+# make sure the factors have the same Levels
+testTask$env$data <- checkLevels(trainTask$env$data, testTask$env$data)
+rfmodel <- predict(rforest, testTask)
+rfmodel
 ```
 
 # Putting all together
@@ -583,17 +547,6 @@ head(opt.paths[[1]])
 ```{r}
 analyzeFeatSelResult(feats[[1]])
 ``` 
-
-# Finally, once you have got the model to be used:
-
-Make final predictions on the test data set:
-
-```{r}
-# make sure the factors have the same Levels
-testTask$env$data <- checkLevels(trainTask$env$data, testTask$env$data)
-rfmodel <- predict(rforest, testTask)
-rfmodel
-```
 
 ```{r}
 # Stop parallel execution

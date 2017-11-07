@@ -1,7 +1,7 @@
 ---
 title: "Automatic Machine Learning"
 author: Jose Magana
-date: 2 Nov 2017
+date: 8 Nov 2017
 output:
   revealjs::revealjs_presentation:
     theme: white
@@ -93,7 +93,7 @@ options(width = 200)
 <img src=automl-figure/datarobot.png height=250>
 - [Skytree](http://www.skytree.net/products/) 
 <img src=automl-figure/skytree.png height=250>
-- [Automatic Statistician](https://www.automaticstatistician.com) (for Exploratory Data Analysis): [Airline](https://www.automaticstatistician.com/static/abcdoutput/01-airline.pdf) & [Affairs](file:///auto-report-affairs.pdf)
+- [Automatic Statistician](https://www.automaticstatistician.com) (for Exploratory Data Analysis): [Airline](https://www.automaticstatistician.com/static/abcdoutput/01-airline.pdf) & [Affairs](file:///D:/Github/mlr/auto-report-affairs.pdf)
 - [IBM Data Science Experience](https://datascience.ibm.com/)
 - [SparkBeyond](http://www.sparkbeyond.com/)
           
@@ -240,11 +240,12 @@ e. variable importance estimation
 
 # Conclusions
 
-## 
+## Conclusions
 
--A
--B
--C
+- There are a number of mature initiatives in the field that can greatly reduce the time needed to obtain results
+- Several aspects of the Data Science work are covered modelling being the one receiving more attention
+- Solutions like MLR  or Auto SKLearn can help Data Scientists to be much more effective on their work. 
+- As progress is made on NLP we can expect the boundaries to extent 
 
 ## License
 
