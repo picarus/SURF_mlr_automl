@@ -34,8 +34,6 @@ options(width = 200)
 - Assisted/Streamlined Machine Learning, NOT Automatic Data Science
 - <b>To date</b>, there is no production level algorithm that can translate a business need expressed in natural language to an algorithm.
 - Hot research topic
-<img src=./automl-figure/computers-algorithm-big_data-data_science-data_analytics-job_loss-jcen1731_low.jpg
- height=300>
 
 ## What can Automatic Machine Learning do
 
